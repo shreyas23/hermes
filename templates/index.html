@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sayfiles</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <h1>Sayfiles</h1>
+        <button id="btn-add" title="Import">+</button>
+      </div>
+
+      <nav id="nav">
+        <div class="nav-item active" data-view="recent">Recent</div>
+        <div class="nav-item" data-view="in_progress">In Progress</div>
+        <div class="nav-section">Sources</div>
+        <div class="nav-item" data-view="articles">Articles</div>
+        <div class="nav-item" data-view="documents">Documents</div>
+        <div class="nav-item" data-view="texts">Text</div>
+        <div id="collections-section">
+          <div class="nav-section">
+            Collections
+            <button id="btn-new-collection" title="New collection">+</button>
+          </div>
+          <div id="collections-list"></div>
+        </div>
+      </nav>
+
+      <div id="item-list"></div>
+    </div>
+
+    <div id="main">
+      <div id="empty-state">
+        <p>Import a file, paste a URL, or add text to start listening</p>
+      </div>
+
+      <div id="generating-state" style="display: none;">
+        <div id="gen-title"></div>
+        <div id="gen-progress-bar"><div id="gen-progress-fill"></div></div>
+        <div id="gen-status"></div>
+        <button id="gen-cancel">Cancel</button>
+      </div>
+
+      <div id="player-state" style="display: none;">
+        <div id="teleprompter">
+          <div id="teleprompter-fade-top"></div>
+          <div id="sentences-container"></div>
+          <div id="teleprompter-fade-bottom"></div>
+        </div>
+
+        <div id="controls">
+          <div id="transport">
+            <button id="btn-speed" title="Playback speed">1x</button>
+            <button id="btn-back15" title="Back 15s">-15</button>
+            <button id="btn-prev" title="Previous sentence">⏮</button>
+            <button id="btn-play" title="Play">▶</button>
+            <button id="btn-pause" title="Pause" style="display:none">⏸</button>
+            <button id="btn-stop" title="Stop">⏹</button>
+            <button id="btn-next" title="Next sentence">⏭</button>
+            <button id="btn-fwd15" title="Forward 15s">+15</button>
+          </div>
+          <div id="progress-bar">
+            <span id="time-current">0:00</span>
+            <input type="range" id="scrubber" min="0" max="10000" value="0" step="1">
+            <span id="time-total">0:00</span>
+          </div>
+          <div id="status-bar">
+            <span id="status-text"></span>
+            <span id="sentence-counter"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini player -->
+  <div id="mini-player" style="display: none;">
+    <div id="mini-info">
+      <div id="mini-title"></div>
+      <div id="mini-time"></div>
+    </div>
+    <div id="mini-controls">
+      <button id="mini-play">▶</button>
+      <button id="mini-pause" style="display:none">⏸</button>
+    </div>
+    <div id="mini-progress"><div id="mini-progress-fill"></div></div>
+  </div>
+
+  <!-- Import modal -->
+  <div id="import-modal" style="display: none;">
+    <div id="import-backdrop"></div>
+    <div id="import-dialog">
+      <h2>Import</h2>
+      <div class="import-tabs">
+        <button class="import-tab active" data-tab="url">URL</button>
+        <button class="import-tab" data-tab="file">File</button>
+        <button class="import-tab" data-tab="folder">Folder</button>
+        <button class="import-tab" data-tab="text">Text</button>
+      </div>
+
+      <div class="import-pane active" id="pane-url">
+        <input type="text" id="import-url" placeholder="https://example.com/article">
+        <button id="import-url-btn">Import Article</button>
+      </div>
+
+      <div class="import-pane" id="pane-file">
+        <input type="text" id="import-file-path" placeholder="/path/to/document.pdf">
+        <button id="import-file-btn">Import File</button>
+      </div>
+
+      <div class="import-pane" id="pane-folder">
+        <input type="text" id="import-folder-path" placeholder="~/Documents">
+        <button id="import-folder-scan-btn">Scan Folder</button>
+        <div id="folder-scan-results"></div>
+      </div>
+
+      <div class="import-pane" id="pane-text">
+        <input type="text" id="import-text-title" placeholder="Title">
+        <textarea id="import-text-content" placeholder="Paste your text here..."></textarea>
+        <button id="import-text-btn">Import Text</button>
+      </div>
+
+      <button id="import-close">Cancel</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

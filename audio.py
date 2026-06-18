@@ -1,0 +1,136 @@
+import os
+import subprocess
+import threading
+import wave
+from dataclasses import dataclass
+
+from models import item_audio_dir, item_master_wav, update_item_audio, delete_item
+
+
+@dataclass
+class SentenceTimestamp:
+    index: int
+    start_ms: float
+    duration_ms: float
+
+
+_active_jobs: dict[int, threading.Event] = {}
+_jobs_lock = threading.Lock()
+
+
+def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None):
+    audio_dir = item_audio_dir(item_id)
+    os.makedirs(audio_dir, exist_ok=True)
+
+    timestamps = []
+    cumulative_ms = 0
+
+    for i, text in enumerate(sentences):
+        if cancel_event.is_set():
+            _cleanup_partial(audio_dir, i)
+            return None, 0
+
+        sent_wav = os.path.join(audio_dir, f'sent_{i:04d}.wav')
+        try:
+            subprocess.run(
+                ['say', '-o', sent_wav, '--file-format=WAVE', '--data-format=LEI16@22050', text],
+                check=True, capture_output=True, timeout=60,
+            )
+            duration_ms = _wav_duration_ms(sent_wav)
+        except Exception as e:
+            print(f"Failed to generate sentence {i}: {e}")
+            duration_ms = 0
+
+        timestamps.append(SentenceTimestamp(index=i, start_ms=cumulative_ms, duration_ms=duration_ms))
+        cumulative_ms += duration_ms
+
+        if on_progress:
+            on_progress(i + 1, len(sentences))
+
+    if cancel_event.is_set():
+        _cleanup_partial(audio_dir, len(sentences))
+        return None, 0
+
+    master_path = item_master_wav(item_id)
+    _concatenate_wavs(audio_dir, len(sentences), master_path)
+
+    for i in range(len(sentences)):
+        sent_wav = os.path.join(audio_dir, f'sent_{i:04d}.wav')
+        if os.path.exists(sent_wav):
+            os.unlink(sent_wav)
+
+    timeline = [{'index': t.index, 'start_ms': t.start_ms, 'duration_ms': t.duration_ms} for t in timestamps]
+    update_item_audio(item_id, timeline, cumulative_ms)
+
+    return timeline, cumulative_ms
+
+
+def generate_audio_background(item_id, sentences, on_progress=None, on_complete=None, on_cancel=None):
+    cancel_event = threading.Event()
+
+    with _jobs_lock:
+        if item_id in _active_jobs:
+            _active_jobs[item_id].set()
+        _active_jobs[item_id] = cancel_event
+
+    def run():
+        try:
+            timeline, total_ms = generate_audio_for_item(item_id, sentences, cancel_event, on_progress)
+            if timeline is None:
+                if on_cancel:
+                    on_cancel(item_id)
+            elif on_complete:
+                on_complete(item_id, timeline, total_ms)
+        finally:
+            with _jobs_lock:
+                if _active_jobs.get(item_id) is cancel_event:
+                    del _active_jobs[item_id]
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
+def cancel_generation(item_id):
+    with _jobs_lock:
+        event = _active_jobs.get(item_id)
+        if event:
+            event.set()
+            return True
+    return False
+
+
+def is_generating(item_id):
+    with _jobs_lock:
+        return item_id in _active_jobs
+
+
+def _cleanup_partial(audio_dir, count):
+    for i in range(count):
+        path = os.path.join(audio_dir, f'sent_{i:04d}.wav')
+        if os.path.exists(path):
+            os.unlink(path)
+    master = os.path.join(audio_dir, 'master.wav')
+    if os.path.exists(master):
+        os.unlink(master)
+    try:
+        os.rmdir(audio_dir)
+    except OSError:
+        pass
+
+
+def _concatenate_wavs(audio_dir, count, output_path):
+    with wave.open(output_path, 'wb') as out:
+        for i in range(count):
+            sent_path = os.path.join(audio_dir, f'sent_{i:04d}.wav')
+            if not os.path.exists(sent_path):
+                continue
+            with wave.open(sent_path, 'rb') as inp:
+                if i == 0:
+                    out.setparams(inp.getparams())
+                out.writeframes(inp.readframes(inp.getnframes()))
+
+
+def _wav_duration_ms(path):
+    with wave.open(path, 'rb') as wf:
+        return (wf.getnframes() / wf.getframerate()) * 1000
