@@ -1,10 +1,24 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+.venv/
 
-# Virtual environments
-.venv
+# macOS
+.DS_Store
+._*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sayfiles library data (user-generated, not source)
+~/sayfiles-library/
+
+# Claude
+.claude/
