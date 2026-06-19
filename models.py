@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 
@@ -8,6 +9,8 @@ LIBRARY_DIR = os.path.expanduser('~/hermes-library')
 DB_PATH = os.path.join(LIBRARY_DIR, 'library.db')
 AUDIO_DIR = os.path.join(LIBRARY_DIR, 'audio')
 IMAGES_DIR = os.path.join(LIBRARY_DIR, 'images')
+
+_local = threading.local()
 
 
 def init_db():
@@ -60,14 +63,19 @@ def init_db():
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA foreign_keys = ON')
+    conn = getattr(_local, 'conn', None)
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA foreign_keys = ON')
+        conn.execute('PRAGMA journal_mode = WAL')
+        _local.conn = conn
     try:
         yield conn
         conn.commit()
-    finally:
-        conn.close()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None):
@@ -108,8 +116,31 @@ def _hydrate_row(row):
     return item
 
 
+def _hydrate_summary(row):
+    item = dict(row)
+    item['sentences'] = json.loads(item['sentences'])
+    item['progress'] = {
+        'current_sentence': row['p_current_sentence'],
+        'current_time_ms': row['p_current_time_ms'],
+        'is_finished': row['p_is_finished'],
+        'last_played_at': row['p_last_played_at'],
+    } if row['p_current_sentence'] is not None else None
+    return item
+
+
 _ITEMS_WITH_PROGRESS = '''
     SELECT i.*,
+           p.current_sentence AS p_current_sentence,
+           p.current_time_ms AS p_current_time_ms,
+           p.is_finished AS p_is_finished,
+           p.last_played_at AS p_last_played_at
+    FROM items i
+    LEFT JOIN progress p ON p.item_id = i.id
+'''
+
+_ITEMS_SUMMARY = '''
+    SELECT i.id, i.title, i.source_type, i.source_url, i.sentences,
+           i.total_duration_ms, i.audio_ready, i.created_at,
            p.current_sentence AS p_current_sentence,
            p.current_time_ms AS p_current_time_ms,
            p.is_finished AS p_is_finished,
@@ -131,7 +162,7 @@ def get_items(source_type=None, collection_id=None):
     with get_db() as db:
         if collection_id:
             rows = db.execute(
-                f'''{_ITEMS_WITH_PROGRESS}
+                f'''{_ITEMS_SUMMARY}
                     JOIN collection_items ci ON ci.item_id = i.id
                     WHERE ci.collection_id = ?
                     ORDER BY ci.position''',
@@ -139,30 +170,39 @@ def get_items(source_type=None, collection_id=None):
             ).fetchall()
         elif source_type:
             rows = db.execute(
-                f'{_ITEMS_WITH_PROGRESS} WHERE i.source_type = ? ORDER BY i.created_at DESC',
+                f'{_ITEMS_SUMMARY} WHERE i.source_type = ? ORDER BY i.created_at DESC',
                 (source_type,)
             ).fetchall()
         else:
-            rows = db.execute(f'{_ITEMS_WITH_PROGRESS} ORDER BY i.created_at DESC').fetchall()
-        return [_hydrate_row(r) for r in rows]
+            rows = db.execute(f'{_ITEMS_SUMMARY} ORDER BY i.created_at DESC').fetchall()
+        return [_hydrate_summary(r) for r in rows]
 
 
 def get_in_progress():
     with get_db() as db:
         rows = db.execute(
-            f'''{_ITEMS_WITH_PROGRESS}
+            f'''{_ITEMS_SUMMARY}
                 WHERE p.current_sentence > 0 AND p.is_finished = 0
                 ORDER BY p.last_played_at DESC'''
         ).fetchall()
-        return [_hydrate_row(r) for r in rows]
+        return [_hydrate_summary(r) for r in rows]
 
 
 def get_recent(limit=20):
     with get_db() as db:
         rows = db.execute(
-            f'{_ITEMS_WITH_PROGRESS} ORDER BY i.created_at DESC LIMIT ?', (limit,)
+            f'{_ITEMS_SUMMARY} ORDER BY i.created_at DESC LIMIT ?', (limit,)
         ).fetchall()
-        return [_hydrate_row(r) for r in rows]
+        return [_hydrate_summary(r) for r in rows]
+
+
+def search_items(query):
+    with get_db() as db:
+        rows = db.execute(
+            f'{_ITEMS_SUMMARY} WHERE i.title LIKE ? ORDER BY i.created_at DESC',
+            (f'%{query}%',)
+        ).fetchall()
+        return [_hydrate_summary(r) for r in rows]
 
 
 def update_progress(item_id, current_sentence, current_time_ms, is_finished=False):
@@ -237,6 +277,10 @@ def item_audio_dir(item_id):
 
 def item_master_wav(item_id):
     return os.path.join(item_audio_dir(item_id), 'master.wav')
+
+
+def item_master_m4a(item_id):
+    return os.path.join(item_audio_dir(item_id), 'master.m4a')
 
 
 def item_images_dir(item_id):

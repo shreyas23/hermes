@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { state, SPEED_OPTIONS } from './state.js';
-import { highlightCurrentSentence, getCurrentSentenceIndex } from './teleprompter.js';
+import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } from './teleprompter.js';
 import { formatTime } from './utils.js';
 
 const btnPlay = document.getElementById('btn-play');
@@ -170,9 +170,7 @@ export function stop() {
   stopProgressSave();
   scrubber.value = 0;
   timeCurrent.textContent = '0:00';
-  document.querySelectorAll('.sentence').forEach(el => {
-    el.classList.remove('is-active', 'is-near', 'is-played');
-  });
+  clearHighlights();
 }
 
 export function seekToSentence(index) {

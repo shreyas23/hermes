@@ -12,8 +12,8 @@ from audio import generate_audio_background, cancel_generation, is_generating
 from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences
 from models import (
     init_db, add_item, get_item, get_items, get_recent, get_in_progress,
-    update_progress, delete_item, item_master_wav, item_images_dir,
-    create_collection, get_collections, add_to_collection,
+    search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
+    item_images_dir, create_collection, get_collections, add_to_collection,
     remove_from_collection, delete_collection,
 )
 
@@ -66,12 +66,11 @@ def library_list():
 
 @app.route('/api/library/search', methods=['GET'])
 def library_search():
-    query = request.args.get('q', '').strip().lower()
+    query = request.args.get('q', '').strip()
     if not query:
         return jsonify({'items': []})
-    items = get_items()
-    results = [i for i in items if query in i['title'].lower()]
-    return jsonify({'items': [_item_summary(i) for i in results]})
+    items = search_items(query)
+    return jsonify({'items': [_item_summary(i) for i in items]})
 
 
 @app.route('/api/library/<int:item_id>', methods=['GET'])
@@ -132,10 +131,13 @@ def library_image(item_id, filename):
 
 @app.route('/api/library/<int:item_id>/audio')
 def library_audio(item_id):
+    m4a_path = item_master_m4a(item_id)
+    if os.path.isfile(m4a_path):
+        return send_file(m4a_path, mimetype='audio/mp4')
     wav_path = item_master_wav(item_id)
-    if not os.path.isfile(wav_path):
-        return jsonify({'error': 'Audio not ready'}), 404
-    return send_file(wav_path, mimetype='audio/wav')
+    if os.path.isfile(wav_path):
+        return send_file(wav_path, mimetype='audio/wav')
+    return jsonify({'error': 'Audio not ready'}), 404
 
 
 # --- Import endpoints ---

@@ -7,6 +7,7 @@ let onSentenceClick = null;
 let autoFollow = true;
 let userScrollTimeout = null;
 let lastHighlightedIndex = -1;
+let sentenceEls = [];
 
 export function initTeleprompter({ onClick }) {
   onSentenceClick = onClick;
@@ -30,6 +31,7 @@ export function initTeleprompter({ onClick }) {
 
 export function renderSentences(sentences, images = [], itemId = null) {
   container.innerHTML = '';
+  sentenceEls = [];
   autoFollow = true;
   lastHighlightedIndex = -1;
   followBtn.classList.remove('is-visible');
@@ -49,6 +51,7 @@ export function renderSentences(sentences, images = [], itemId = null) {
     el.dataset.index = i;
     el.textContent = text;
     el.addEventListener('click', () => onSentenceClick?.(i));
+    sentenceEls.push(el);
     container.appendChild(el);
 
     if (imagesByPosition[i] && itemId) {
@@ -75,23 +78,50 @@ export function renderSentences(sentences, images = [], itemId = null) {
 export function getCurrentSentenceIndex() {
   if (!state.timeline.length) return -1;
   const currentMs = state.audio.currentTime * 1000;
-  for (let i = state.timeline.length - 1; i >= 0; i--) {
-    if (currentMs >= state.timeline[i].start_ms) return i;
+  let lo = 0, hi = state.timeline.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (state.timeline[mid].start_ms <= currentMs) lo = mid + 1;
+    else hi = mid - 1;
   }
-  return 0;
+  return Math.max(0, lo - 1);
+}
+
+export function clearHighlights() {
+  lastHighlightedIndex = -1;
+  for (const el of sentenceEls) {
+    el.classList.remove('is-active', 'is-near', 'is-played');
+  }
 }
 
 export function highlightCurrentSentence() {
   const index = getCurrentSentenceIndex();
   if (index === lastHighlightedIndex) return;
+  const prev = lastHighlightedIndex;
   lastHighlightedIndex = index;
 
-  const els = container.querySelectorAll('.sentence');
-  els.forEach((el, i) => {
-    el.classList.toggle('is-active', i === index);
-    el.classList.toggle('is-near', i !== index && Math.abs(i - index) <= 2);
-    el.classList.toggle('is-played', i < index && Math.abs(i - index) > 2);
-  });
+  const els = sentenceEls;
+  if (!els.length) return;
+
+  const updateRange = (from, to) => {
+    const lo = Math.max(0, Math.min(from, to) - 3);
+    const hi = Math.min(els.length - 1, Math.max(from, to) + 3);
+    for (let i = lo; i <= hi; i++) {
+      els[i].classList.toggle('is-active', i === index);
+      els[i].classList.toggle('is-near', i !== index && Math.abs(i - index) <= 2);
+      els[i].classList.toggle('is-played', i < index && Math.abs(i - index) > 2);
+    }
+  };
+
+  if (prev === -1) {
+    for (let i = 0; i < els.length; i++) {
+      els[i].classList.toggle('is-active', i === index);
+      els[i].classList.toggle('is-near', i !== index && Math.abs(i - index) <= 2);
+      els[i].classList.toggle('is-played', i < index && Math.abs(i - index) > 2);
+    }
+  } else {
+    updateRange(prev, index);
+  }
 
   if (autoFollow) {
     scrollToActive();
@@ -101,7 +131,7 @@ export function highlightCurrentSentence() {
 }
 
 function scrollToActive() {
-  const activeEl = container.querySelector('.sentence.is-active');
+  const activeEl = lastHighlightedIndex >= 0 ? sentenceEls[lastHighlightedIndex] : null;
   if (!activeEl) return;
 
   const containerRect = container.getBoundingClientRect();
@@ -113,7 +143,7 @@ function scrollToActive() {
 }
 
 function updateFollowButton() {
-  const activeEl = container.querySelector('.sentence.is-active');
+  const activeEl = lastHighlightedIndex >= 0 ? sentenceEls[lastHighlightedIndex] : null;
   if (!activeEl || !state.playing) {
     followBtn.classList.remove('is-visible');
     return;

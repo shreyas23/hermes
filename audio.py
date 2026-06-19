@@ -5,7 +5,7 @@ import wave
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from models import item_audio_dir, item_master_wav, update_item_audio, delete_item
+from models import item_audio_dir, item_master_wav, item_master_m4a, update_item_audio, delete_item
 
 TTS_WORKERS = 4
 
@@ -65,8 +65,12 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None):
         _cleanup_partial(audio_dir, len(sentences))
         return None, 0
 
-    master_path = item_master_wav(item_id)
-    _concatenate_wavs(audio_dir, len(sentences), master_path)
+    wav_path = item_master_wav(item_id)
+    _concatenate_wavs(audio_dir, len(sentences), wav_path)
+
+    m4a_path = item_master_m4a(item_id)
+    _convert_to_m4a(wav_path, m4a_path)
+    os.unlink(wav_path)
 
     timestamps = []
     cumulative_ms = 0
@@ -130,13 +134,21 @@ def _cleanup_partial(audio_dir, count):
         path = os.path.join(audio_dir, f'sent_{i:04d}.wav')
         if os.path.exists(path):
             os.unlink(path)
-    master = os.path.join(audio_dir, 'master.wav')
-    if os.path.exists(master):
-        os.unlink(master)
+    for name in ('master.wav', 'master.m4a'):
+        path = os.path.join(audio_dir, name)
+        if os.path.exists(path):
+            os.unlink(path)
     try:
         os.rmdir(audio_dir)
     except OSError:
         pass
+
+
+def _convert_to_m4a(wav_path, m4a_path):
+    subprocess.run(
+        ['afconvert', '-f', 'm4af', '-d', 'aac', '-b', '64000', wav_path, m4a_path],
+        check=True, capture_output=True, timeout=300,
+    )
 
 
 def _concatenate_wavs(audio_dir, count, output_path):
