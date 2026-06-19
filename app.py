@@ -383,13 +383,37 @@ def start_server():
 
 if __name__ == '__main__':
     import webview
+
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
-    webview.create_window(
+
+    window = webview.create_window(
         'Hermes',
         'http://127.0.0.1:5123',
         width=1100,
         height=750,
         min_size=(800, 500),
     )
-    webview.start()
+
+    def _on_closing():
+        window.hide()
+        return False
+
+    def _setup_dock_reopen():
+        try:
+            from AppKit import NSApplication
+            from Foundation import NSObject
+
+            class DockDelegate(NSObject):
+                def applicationShouldHandleReopen_hasVisibleWindows_(self, app, flag):
+                    window.show()
+                    return True
+
+            ns_app = NSApplication.sharedApplication()
+            delegate = DockDelegate.alloc().init()
+            ns_app.setDelegate_(delegate)
+        except ImportError:
+            pass
+
+    window.events.closing += _on_closing
+    webview.start(func=_setup_dock_reopen)
