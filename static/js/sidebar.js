@@ -1,0 +1,119 @@
+import { api } from './api.js';
+import { state } from './state.js';
+import { formatTime, escHtml } from './utils.js';
+
+const itemList = document.getElementById('item-list');
+const collectionsList = document.getElementById('collections-list');
+
+let onItemOpen = null;
+let onItemDelete = null;
+
+export function initSidebar({ onOpen, onDelete }) {
+  onItemOpen = onOpen;
+  onItemDelete = onDelete;
+
+  document.querySelectorAll('.nav__item').forEach(el => {
+    el.addEventListener('click', () => {
+      setActiveNav(el);
+      state.currentView = el.dataset.view;
+      loadView(el.dataset.view);
+    });
+  });
+
+  document.getElementById('btn-new-collection').addEventListener('click', async () => {
+    const name = prompt('Collection name:');
+    if (!name) return;
+    await api('/api/collections', { body: { name } });
+    loadCollections();
+  });
+}
+
+function setActiveNav(el) {
+  document.querySelectorAll('.nav__item, .nav__collection').forEach(e => e.classList.remove('is-active'));
+  el.classList.add('is-active');
+}
+
+export async function loadView(view) {
+  let params;
+  switch (view) {
+    case 'recent': params = '?view=recent'; break;
+    case 'in_progress': params = '?view=in_progress'; break;
+    case 'articles': params = '?source_type=article'; break;
+    case 'documents': params = '?source_type=document'; break;
+    case 'texts': params = '?source_type=text'; break;
+    default: params = ''; break;
+  }
+  const data = await api(`/api/library${params}`);
+  if (data.items) renderItemList(data.items);
+}
+
+async function loadCollection(id) {
+  const data = await api(`/api/library?view=collection&collection_id=${id}`);
+  if (data.items) renderItemList(data.items);
+}
+
+function renderItemList(items) {
+  itemList.innerHTML = '';
+  if (items.length === 0) {
+    itemList.innerHTML = '<div class="item-list__empty">No items yet</div>';
+    return;
+  }
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'item' + (item.id === state.currentItemId ? ' is-active' : '');
+
+    const dur = item.audio_ready ? formatTime(item.total_duration_ms) : '';
+    let badge = '';
+    if (!item.audio_ready) {
+      badge = item.interrupted
+        ? '<span class="badge badge--interrupted">interrupted</span>'
+        : '<span class="badge badge--generating">generating</span>';
+    }
+    let progress = '';
+    if (item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished && item.total_duration_ms > 0) {
+      const pct = Math.round((item.progress.current_time_ms / item.total_duration_ms) * 100);
+      progress = `<div class="item__progress"><div class="item__progress-fill" style="width:${pct}%"></div></div>`;
+    }
+
+    el.innerHTML = `
+      <div class="item__body">
+        <div class="item__title">${escHtml(item.title)}</div>
+        <div class="item__meta">
+          <span>${item.source_type}</span>
+          ${dur ? `<span>${dur}</span>` : ''}
+          ${badge}
+        </div>
+        ${progress}
+      </div>
+      <button class="item__delete" title="Delete">&times;</button>
+    `;
+
+    el.addEventListener('click', () => onItemOpen?.(item.id));
+    el.querySelector('.item__delete').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete "${item.title}"?`)) return;
+      await api(`/api/library/${item.id}`, { method: 'DELETE' });
+      onItemDelete?.(item.id);
+      loadView(state.currentView);
+      loadCollections();
+    });
+
+    itemList.appendChild(el);
+  });
+}
+
+export async function loadCollections() {
+  const data = await api('/api/collections');
+  if (!data.collections) return;
+  collectionsList.innerHTML = '';
+  data.collections.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'nav__collection';
+    el.textContent = `${c.name} (${c.count})`;
+    el.addEventListener('click', () => {
+      setActiveNav(el);
+      loadCollection(c.id);
+    });
+    collectionsList.appendChild(el);
+  });
+}

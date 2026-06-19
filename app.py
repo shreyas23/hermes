@@ -2,16 +2,17 @@ import json
 import os
 import queue
 import threading
+import time
 from pathlib import Path
 
 from flask import Flask, Response, render_template, request, jsonify, send_file
 from pysbd import Segmenter
 
-from audio import generate_audio_background, cancel_generation
-from extractors import SUPPORTED_EXTENSIONS, extract_text
+from audio import generate_audio_background, cancel_generation, is_generating
+from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences
 from models import (
     init_db, add_item, get_item, get_items, get_recent, get_in_progress,
-    update_progress, delete_item, item_master_wav,
+    update_progress, delete_item, item_master_wav, item_images_dir,
     create_collection, get_collections, add_to_collection,
     remove_from_collection, delete_collection,
 )
@@ -99,6 +100,26 @@ def library_progress(item_id):
     return jsonify({'saved': True})
 
 
+@app.route('/api/library/<int:item_id>/retry', methods=['POST'])
+def library_retry(item_id):
+    item = get_item(item_id)
+    if not item:
+        return jsonify({'error': 'Not found'}), 404
+    if item['audio_ready']:
+        return jsonify({'error': 'Audio already generated'}), 400
+    _start_generation(item_id, item['sentences'])
+    return jsonify({'retrying': True, 'item_id': item_id})
+
+
+@app.route('/api/library/<int:item_id>/images/<path:filename>')
+def library_image(item_id, filename):
+    img_dir = item_images_dir(item_id)
+    filepath = os.path.join(img_dir, filename)
+    if not os.path.isfile(filepath):
+        return jsonify({'error': 'Image not found'}), 404
+    return send_file(filepath)
+
+
 @app.route('/api/library/<int:item_id>/audio')
 def library_audio(item_id):
     wav_path = item_master_wav(item_id)
@@ -115,12 +136,18 @@ def import_file():
     if not os.path.isfile(file_path):
         return jsonify({'error': 'File not found'}), 404
 
-    text = extract_text(file_path)
-    if not text or not text.strip():
+    item_id_placeholder = int(time.time() * 1000) % 1000000
+    img_dir = item_images_dir(item_id_placeholder)
+    os.makedirs(img_dir, exist_ok=True)
+
+    result = extract_with_images(file_path, img_dir)
+    if not result or not result['text'].strip():
         return jsonify({'error': 'Could not extract text'}), 400
 
+    text = result['text']
     title = Path(file_path).stem
     sentences = _split(text)
+    images = map_images_to_sentences(result.get('images', []), text, sentences)
 
     item_id = add_item(
         title=title,
@@ -128,7 +155,20 @@ def import_file():
         text_content=text,
         sentences=sentences,
         original_path=file_path,
+        images=images,
     )
+
+    real_img_dir = item_images_dir(item_id)
+    if img_dir != real_img_dir:
+        if os.path.isdir(img_dir) and os.listdir(img_dir):
+            os.makedirs(real_img_dir, exist_ok=True)
+            for f in os.listdir(img_dir):
+                os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+        if os.path.isdir(img_dir):
+            try:
+                os.rmdir(img_dir)
+            except OSError:
+                pass
 
     _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
@@ -146,10 +186,6 @@ def import_url():
     if not downloaded:
         return jsonify({'error': 'Could not download page'}), 400
 
-    text = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
-    if not text or not text.strip():
-        return jsonify({'error': 'Could not extract article text'}), 400
-
     title = url
     try:
         meta_json = trafilatura.extract(downloaded, output_format='json', include_comments=False)
@@ -159,15 +195,38 @@ def import_url():
     except (ValueError, TypeError):
         pass
 
-    sentences = _split(text)
+    text_only = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
+    if not text_only or not text_only.strip():
+        return jsonify({'error': 'Could not extract article text'}), 400
+
+    item_id_placeholder = int(time.time() * 1000) % 1000000
+    img_dir = item_images_dir(item_id_placeholder)
+    os.makedirs(img_dir, exist_ok=True)
+
+    img_result = extract_url_with_images(downloaded, url, img_dir)
+    sentences = _split(text_only)
+    images = map_images_to_sentences(img_result.get('images', []) if img_result else [], text_only, sentences)
 
     item_id = add_item(
         title=title,
         source_type='article',
-        text_content=text,
+        text_content=text_only,
         sentences=sentences,
         source_url=url,
+        images=images,
     )
+
+    real_img_dir = item_images_dir(item_id)
+    if img_dir != real_img_dir:
+        if os.path.isdir(img_dir) and os.listdir(img_dir):
+            os.makedirs(real_img_dir, exist_ok=True)
+            for f in os.listdir(img_dir):
+                os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+        if os.path.isdir(img_dir):
+            try:
+                os.rmdir(img_dir)
+            except OSError:
+                pass
 
     _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
@@ -293,12 +352,16 @@ def _start_generation(item_id, sentences):
 
 
 def _item_summary(item):
+    audio_ready = bool(item['audio_ready'])
+    generating = not audio_ready and is_generating(item['id'])
     return {
         'id': item['id'],
         'title': item['title'],
         'source_type': item['source_type'],
         'source_url': item.get('source_url'),
-        'audio_ready': bool(item['audio_ready']),
+        'audio_ready': audio_ready,
+        'generating': generating,
+        'interrupted': not audio_ready and not generating,
         'total_duration_ms': item['total_duration_ms'],
         'sentence_count': len(item['sentences']),
         'created_at': item['created_at'],

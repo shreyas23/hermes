@@ -7,11 +7,13 @@ from contextlib import contextmanager
 LIBRARY_DIR = os.path.expanduser('~/hermes-library')
 DB_PATH = os.path.join(LIBRARY_DIR, 'library.db')
 AUDIO_DIR = os.path.join(LIBRARY_DIR, 'audio')
+IMAGES_DIR = os.path.join(LIBRARY_DIR, 'images')
 
 
 def init_db():
     os.makedirs(LIBRARY_DIR, exist_ok=True)
     os.makedirs(AUDIO_DIR, exist_ok=True)
+    os.makedirs(IMAGES_DIR, exist_ok=True)
     with get_db() as db:
         db.executescript('''
             CREATE TABLE IF NOT EXISTS items (
@@ -50,6 +52,10 @@ def init_db():
                 PRIMARY KEY (collection_id, item_id)
             );
         ''')
+        try:
+            db.execute('ALTER TABLE items ADD COLUMN images TEXT')
+        except sqlite3.OperationalError:
+            pass
 
 
 @contextmanager
@@ -64,15 +70,15 @@ def get_db():
         conn.close()
 
 
-def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None):
+def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None):
     now = time.time()
     with get_db() as db:
         cur = db.execute(
             '''INSERT INTO items (title, source_type, source_url, original_path,
-               text_content, sentences, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+               text_content, sentences, images, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (title, source_type, source_url, original_path,
-             text_content, json.dumps(sentences), now, now)
+             text_content, json.dumps(sentences), json.dumps(images or []), now, now)
         )
         item_id = cur.lastrowid
         db.execute('INSERT INTO progress (item_id) VALUES (?)', (item_id,))
@@ -92,6 +98,7 @@ def _hydrate_row(row):
     item = dict(row)
     item['sentences'] = json.loads(item['sentences'])
     item['timeline'] = json.loads(item['timeline']) if item['timeline'] else None
+    item['images'] = json.loads(item['images']) if item.get('images') else []
     item['progress'] = {
         'current_sentence': row['p_current_sentence'],
         'current_time_ms': row['p_current_time_ms'],
@@ -171,11 +178,11 @@ def update_progress(item_id, current_sentence, current_time_ms, is_finished=Fals
 
 
 def delete_item(item_id):
-    audio_dir = item_audio_dir(item_id)
-    if os.path.isdir(audio_dir):
-        for f in os.listdir(audio_dir):
-            os.unlink(os.path.join(audio_dir, f))
-        os.rmdir(audio_dir)
+    for d in [item_audio_dir(item_id), item_images_dir(item_id)]:
+        if os.path.isdir(d):
+            for f in os.listdir(d):
+                os.unlink(os.path.join(d, f))
+            os.rmdir(d)
     with get_db() as db:
         db.execute('DELETE FROM items WHERE id = ?', (item_id,))
 
@@ -230,3 +237,7 @@ def item_audio_dir(item_id):
 
 def item_master_wav(item_id):
     return os.path.join(item_audio_dir(item_id), 'master.wav')
+
+
+def item_images_dir(item_id):
+    return os.path.join(IMAGES_DIR, str(item_id))
