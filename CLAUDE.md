@@ -1,4 +1,4 @@
-# Sayfiles
+# Hermes
 
 Text-to-podcast desktop app for macOS. Converts documents and articles into audio with a teleprompter UI, library management, and podcast-style playback controls.
 
@@ -7,7 +7,7 @@ Text-to-podcast desktop app for macOS. Converts documents and articles into audi
 - **Backend:** Python + Flask (port 5123)
 - **Window:** PyWebView (native macOS WebKit, not Electron)
 - **TTS:** macOS `say -o` generates per-sentence WAV files, concatenated into a cached master WAV per item
-- **Storage:** SQLite at `~/sayfiles-library/library.db`, audio cache at `~/sayfiles-library/audio/<item_id>/master.wav`
+- **Storage:** SQLite at `~/hermes-library/library.db`, audio cache at `~/hermes-library/audio/<item_id>/master.wav`
 - **Sentence splitting:** pysbd
 - **Frontend:** Vanilla HTML/CSS/JS, SSE for real-time updates
 
@@ -23,10 +23,10 @@ Text-to-podcast desktop app for macOS. Converts documents and articles into audi
 
 ## Storage layout
 
-All user data lives under `~/sayfiles-library/`:
+All user data lives under `~/hermes-library/`:
 
 ```
-~/sayfiles-library/
+~/hermes-library/
   library.db                # SQLite database (items, progress, collections)
   audio/
     <item_id>/
@@ -40,7 +40,7 @@ All user data lives under `~/sayfiles-library/`:
 ## Running
 
 ```
-cd ~/sayfiles && uv run python app.py
+cd ~/hermes && uv run python app.py
 ```
 
 ## Import flow

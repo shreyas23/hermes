@@ -316,7 +316,7 @@ if __name__ == '__main__':
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
     webview.create_window(
-        'Sayfiles',
+        'Hermes',
         'http://127.0.0.1:5123',
         width=1100,
         height=750,

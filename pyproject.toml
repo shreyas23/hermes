@@ -1,5 +1,5 @@
 [project]
-name = "sayfiles"
+name = "hermes"
 version = "0.1.0"
 description = "Text-to-podcast desktop app for macOS"
 requires-python = ">=3.12"

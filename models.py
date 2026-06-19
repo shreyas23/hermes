@@ -4,7 +4,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 
-LIBRARY_DIR = os.path.expanduser('~/sayfiles-library')
+LIBRARY_DIR = os.path.expanduser('~/hermes-library')
 DB_PATH = os.path.join(LIBRARY_DIR, 'library.db')
 AUDIO_DIR = os.path.join(LIBRARY_DIR, 'audio')
 

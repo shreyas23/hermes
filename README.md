@@ -1,8 +1,8 @@
-# Sayfiles
+# Hermes
 
-Turn any document or article into a podcast. Sayfiles is a macOS desktop app that converts text into speech with a teleprompter-style reading view, a full library system, and podcast-grade playback controls.
+Turn any document or article into a podcast. Hermes is a macOS desktop app that converts text into speech with a teleprompter-style reading view, a full library system, and podcast-grade playback controls.
 
-Paste a URL, drop in a PDF, or import a folder of documents — Sayfiles extracts the text, generates audio using macOS text-to-speech, and gives you a native app experience with scrubbing, speed control, and progress tracking.
+Paste a URL, drop in a PDF, or import a folder of documents — Hermes extracts the text, generates audio using macOS text-to-speech, and gives you a native app experience with scrubbing, speed control, and progress tracking.
 
 ## Features
 
@@ -30,8 +30,8 @@ Paste a URL, drop in a PDF, or import a folder of documents — Sayfiles extract
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone and run
-git clone https://github.com/shreyas23/sayfiles.git
-cd sayfiles
+git clone https://github.com/shreyas23/hermes.git
+cd hermes
 uv run python app.py
 ```
 
@@ -122,10 +122,10 @@ Audio is generated at ~4x real-time (a 5-minute article takes ~75 seconds).
 
 ### Data storage
 
-All user data lives in `~/sayfiles-library/`:
+All user data lives in `~/hermes-library/`:
 
 ```
-~/sayfiles-library/
+~/hermes-library/
 ├── library.db              # SQLite: metadata, text, timelines, progress
 └── audio/
     └── <item_id>/
@@ -141,8 +141,8 @@ All user data lives in `~/sayfiles-library/`:
 ### Setup
 
 ```bash
-git clone https://github.com/shreyas23/sayfiles.git
-cd sayfiles
+git clone https://github.com/shreyas23/hermes.git
+cd hermes
 uv sync
 ```
 
@@ -157,7 +157,7 @@ The Flask server starts on `http://127.0.0.1:5123` and a PyWebView window opens 
 ### Project structure
 
 ```
-sayfiles/
+hermes/
 ├── app.py              # Flask app + PyWebView launcher
 ├── audio.py            # TTS generation and audio caching
 ├── extractors.py       # Text extraction (PDF, DOCX, HTML, etc.)
