@@ -373,15 +373,22 @@
 /* Reader view */
 .reader {
   flex: 1;
+  position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
 .reader__scroll {
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   padding: var(--space-8) var(--space-12);
+}
+
+.reader__scroll > * {
   max-width: 720px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .reader__scroll::-webkit-scrollbar {
