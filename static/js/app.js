@@ -1,25 +1,13 @@
 import { api, connectSSE } from './api.js';
 import { state } from './state.js';
 import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
-import { initTeleprompter, renderSentences, highlightCurrentSentence } from './teleprompter.js';
-import { initPlayer, loadAudio, stop, saveProgress, seekToSentence } from './player.js';
+import { initReaderHighlight, renderContent } from './reader-highlight.js';
+import { initPlayer, loadAudio, stop, saveProgress } from './player.js';
 import { initModal } from './modal.js';
-import { escHtml } from './utils.js';
 
 const emptyState = document.getElementById('empty-state');
-const generatingState = document.getElementById('generating-state');
 const playerState = document.getElementById('player-state');
-const genTitle = document.getElementById('gen-title');
-const genProgressFill = document.getElementById('gen-progress-fill');
-const genStatus = document.getElementById('gen-status');
 const miniPlayer = document.getElementById('mini-player');
-const genCancel = document.getElementById('gen-cancel');
-const genRetry = document.getElementById('gen-retry');
-const teleprompterView = document.getElementById('teleprompter-view');
-const readerView = document.getElementById('reader-view');
-const readerContent = document.getElementById('reader-content');
-const tabListen = document.getElementById('tab-listen');
-const tabRead = document.getElementById('tab-read');
 const controlsEl = document.querySelector('.controls');
 
 // --- Init ---
@@ -37,10 +25,7 @@ initSidebar({
   },
 });
 
-initTeleprompter({
-  onClick: seekToSentence,
-});
-
+initReaderHighlight();
 initPlayer();
 
 initModal({
@@ -71,58 +56,11 @@ connectSSE({
   },
 });
 
-genCancel.addEventListener('click', async () => {
-  if (!state.currentItemId) return;
-  await api(`/api/library/${state.currentItemId}/cancel`, { body: {} });
-  state.currentItemId = null;
-  state.currentItem = null;
-  showView('empty');
-  miniPlayer.classList.remove('is-visible');
-  loadView(state.currentView);
-  loadCollections();
-});
-
-genRetry.addEventListener('click', async () => {
-  if (!state.currentItemId) return;
-  genRetry.classList.add('is-hidden');
-  genCancel.classList.remove('is-hidden');
-  genStatus.textContent = 'Generating audio...';
-  genProgressFill.style.width = '0%';
-  await api(`/api/library/${state.currentItemId}/retry`, { body: {} });
-});
-
 miniPlayer.addEventListener('click', () => {
   if (state.currentItemId && !playerState.classList.contains('is-visible')) {
     openItem(state.currentItemId);
   }
 });
-
-// --- Listen / Read tabs ---
-tabListen.addEventListener('click', () => setMode('listen'));
-tabRead.addEventListener('click', () => setMode('read'));
-
-function setMode(mode) {
-  tabListen.classList.toggle('is-active', mode === 'listen');
-  tabRead.classList.toggle('is-active', mode === 'read');
-  teleprompterView.classList.toggle('is-hidden', mode !== 'listen');
-  readerView.classList.toggle('is-hidden', mode !== 'read');
-}
-
-function renderReader(item) {
-  readerContent.innerHTML = '';
-
-  if (item.reader_html) {
-    readerContent.innerHTML = item.reader_html;
-    return;
-  }
-
-  item.sentences.forEach((text) => {
-    const p = document.createElement('p');
-    p.className = 'reader__paragraph';
-    p.textContent = text;
-    readerContent.appendChild(p);
-  });
-}
 
 loadView('recent');
 loadCollections();
@@ -140,29 +78,20 @@ async function openItem(itemId) {
   state.timeline = data.item.timeline || [];
   state.totalDurationMs = data.item.total_duration_ms;
 
-  // Re-highlight active item in sidebar
   document.querySelectorAll('.item').forEach(el => el.classList.remove('is-active'));
 
-  renderReader(data.item);
-  renderSentences(data.item.sentences, data.item.images || [], data.item.id);
-
-  if (!data.item.audio_ready) {
-    showView('player');
-    setMode('read');
-    tabListen.classList.add('is-hidden');
-    controlsEl.classList.add('is-hidden');
-    return;
-  }
-
-  tabListen.classList.remove('is-hidden');
-  controlsEl.classList.remove('is-hidden');
   showView('player');
-  setMode('listen');
-  loadAudio(data.item);
+  renderContent(data.item);
+
+  if (data.item.audio_ready) {
+    controlsEl.classList.remove('is-hidden');
+    loadAudio(data.item);
+  } else {
+    controlsEl.classList.add('is-hidden');
+  }
 }
 
 function showView(view) {
   emptyState.classList.toggle('is-hidden', view !== 'empty');
-  generatingState.classList.toggle('is-visible', view === 'generating');
   playerState.classList.toggle('is-visible', view === 'player');
 }

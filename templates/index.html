@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/layout.css">
   <link rel="stylesheet" href="/static/css/components.css">
-  <link rel="stylesheet" href="/static/css/teleprompter.css">
 </head>
 <body>
   <div class="app" id="app">
@@ -56,20 +55,9 @@
       </div>
 
       <div class="player-state" id="player-state">
-        <div class="player-state__tabs">
-          <button class="player-state__tab is-active" id="tab-listen" data-mode="listen">Listen</button>
-          <button class="player-state__tab" id="tab-read" data-mode="read">Read</button>
-        </div>
-
-        <div class="reader is-hidden" id="reader-view">
+        <div class="reader" id="reader-view">
           <div class="reader__scroll" id="reader-content"></div>
-        </div>
-
-        <div class="teleprompter" id="teleprompter-view">
-          <div class="teleprompter__fade-top"></div>
-          <div class="teleprompter__scroll" id="sentences-container"></div>
-          <div class="teleprompter__fade-bottom"></div>
-          <button class="teleprompter__follow" id="btn-follow">&#x2193; Now playing</button>
+          <button class="reader__follow" id="btn-follow">&#x2193; Now playing</button>
         </div>
 
         <div class="controls">

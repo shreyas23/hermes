@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { state, SPEED_OPTIONS } from './state.js';
-import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } from './teleprompter.js';
+import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } from './reader-highlight.js';
 import { formatTime } from './utils.js';
 
 const btnPlay = document.getElementById('btn-play');
