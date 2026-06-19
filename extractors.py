@@ -57,7 +57,7 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
         if tag.name not in KEEP_TAGS:
             tag.unwrap()
         else:
-            attrs = {k: v for k, v in tag.attrs.items() if k in KEEP_ATTRS}
+            attrs = {k: v for k, v in tag.attrs.items() if k in KEEP_ATTRS and v}
             if tag.name == 'img' and 'src' in attrs:
                 attrs['src'] = urljoin(base_url, attrs['src'])
             if tag.name == 'a' and 'href' in attrs:
