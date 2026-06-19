@@ -76,7 +76,12 @@
 
       <div class="player-state" id="player-state">
         <div class="reader" id="reader-view">
-          <button class="reader__toc-btn is-hidden" id="btn-toc" title="Table of Contents">&#x2630;</button>
+          <button class="reader__toc-btn is-hidden" id="btn-toc" title="Table of Contents">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <line x1="5" y1="3" x2="14" y2="3"/><line x1="5" y1="8" x2="14" y2="8"/><line x1="5" y1="13" x2="14" y2="13"/>
+              <circle cx="2" cy="3" r="1" fill="currentColor" stroke="none"/><circle cx="2" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="2" cy="13" r="1" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
           <div class="reader__toc is-hidden" id="reader-toc"></div>
           <div class="reader__scroll" id="reader-content"></div>
           <button class="reader__follow" id="btn-follow">&#x2193; Now playing</button>
