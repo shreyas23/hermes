@@ -2,6 +2,12 @@
 
 Text-to-podcast desktop app for macOS. Converts documents and articles into audio with a teleprompter UI, library management, and podcast-style playback controls.
 
+## Git conventions
+
+- Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `style:`, `docs:`, `chore:`)
+- Keep commits small and isolated — one logical change per commit
+- Author: `shreyas23 <shreyas.niradi@gmail.com>`
+
 ## Architecture
 
 - **Backend:** Python + Flask (port 5123)
