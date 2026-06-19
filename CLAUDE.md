@@ -22,9 +22,12 @@ Text-to-podcast desktop app for macOS. Converts documents and articles into audi
 - `app.py` — Flask routes + PyWebView entry point
 - `models.py` — SQLite schema and queries (items, progress, collections)
 - `audio.py` — TTS generation, WAV concatenation, caching
-- `extractors.py` — Text extraction (PDF via pymupdf, DOCX via python-docx, HTML via bs4, RTF via striprtf, MD/TXT built-in)
-- `static/app.js` — Frontend: library UI, teleprompter, audio playback, controls
-- `static/style.css` — Dark theme styling
+- `extractors.py` — Text extraction (PDF via pymupdf4llm, DOCX via python-docx, HTML via bs4, RTF via striprtf, MD/TXT built-in)
+- `static/js/app.js` — Frontend: init, item opening, SSE events
+- `static/js/reader-highlight.js` — Reader view rendering, sentence highlighting, TOC panel
+- `static/js/player.js` — Audio playback, scrubber, progress saving
+- `static/js/sidebar.js` — Library sidebar, item list, navigation
+- `static/css/components.css` — Component styles (reader, controls, TOC, tables)
 - `templates/index.html` — Main HTML layout
 
 ## Storage layout
@@ -39,7 +42,7 @@ All user data lives under `~/hermes-library/`:
       master.wav            # Concatenated audio (22050Hz mono 16-bit PCM)
 ```
 
-- **library.db** — contains item metadata (title, source_type, source_url, original_path), extracted text content, sentence arrays (JSON), timeline mappings (JSON), playback progress, and collection membership.
+- **library.db** — contains item metadata (title, source_type, source_url, original_path), extracted text content, sentence arrays (JSON), timeline mappings (JSON), playback progress, collection membership, reader_html (structured HTML for PDFs/articles), and toc (JSON table of contents for PDFs).
 - **audio/<item_id>/master.wav** — cached TTS audio for each item. Generated once on import, ~150MB per hour of content. During generation, temporary per-sentence WAVs (`sent_0000.wav`, etc.) are created in the same directory and deleted after concatenation.
 - Original files are NOT copied into the library — only extracted text is stored in the database.
 
@@ -53,9 +56,11 @@ cd ~/hermes && uv run python app.py
 
 1. User imports via URL, file path, folder scan, or pasted text
 2. Text extracted → split into sentences → stored in SQLite
-3. Background thread generates per-sentence WAVs via `say -o`, concatenates into master.wav
-4. SSE broadcasts generation progress to frontend
-5. Once complete, audio is cached — subsequent plays are instant with native scrubbing
+3. **PDFs:** pymupdf4llm extracts structured markdown using `TocHeaders` for heading hierarchy from PDF bookmarks. Markdown is cleaned (TOC pages stripped, page footers removed, bold-only lines matching TOC entries promoted to headings), converted to HTML via the `markdown` library, and table rows/columns are merged to fix pymupdf4llm's cell-splitting artifacts. The result is stored as `reader_html` with a navigable `toc` (JSON array of `{level, title, id}` entries). Table rendering is controlled by the `pdf_tables` setting (default: `off`).
+4. **URLs:** readability extracts article HTML, cleaned and stored as `reader_html`
+5. Background thread generates per-sentence audio, concatenates into master file
+6. SSE broadcasts generation progress to frontend
+7. Once complete, audio is cached — subsequent plays are instant with native scrubbing
 
 ## Playback
 
@@ -66,12 +71,20 @@ cd ~/hermes && uv run python app.py
 
 ## Dependencies
 
-Managed via `uv`. Key deps: flask, pywebview, pymupdf, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura.
+Managed via `uv`. Key deps: flask, pywebview, pymupdf, pymupdf4llm, markdown, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura.
 
 Note: system pip/pip3 have a broken expat library on this machine — always use `uv` for dependency management.
 
+## Settings
+
+Stored in SQLite `settings` table. Key settings:
+- `tts_engine` — `edge` (default) or `say`
+- `edge_voice` / `say_voice` — voice selection per engine
+- `pdf_tables` — `off` (default) disables HTML table rendering in PDFs; set to `on` to enable (tables are often broken by pymupdf4llm's cell-splitting)
+
 ## Future development
 
+- **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
 - **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click
 - **Sleep timer** — auto-pause after N minutes

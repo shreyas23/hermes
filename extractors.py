@@ -616,7 +616,10 @@ def _pdf_md_to_html(md):
             cleaned_lines.append(line)
     md = '\n'.join(cleaned_lines)
 
-    html = md_lib.markdown(md, extensions=['tables'])
+    from models import get_setting
+    use_tables = get_setting('pdf_tables') != 'off'
+    extensions = ['tables'] if use_tables else []
+    html = md_lib.markdown(md, extensions=extensions)
 
     soup = BeautifulSoup(html, 'html.parser')
     counter = 0
@@ -665,7 +668,7 @@ def _merge_pdf_table_rows(soup):
 
             is_continuation = (
                 prev_row is not None and (
-                    empty_count > len(cells) / 2 or
+                    (not first and empty_count > len(cells) / 2) or
                     (first and first[0].islower()) or
                     (prev_first and prev_first.endswith('-'))
                 )
@@ -689,6 +692,59 @@ def _merge_pdf_table_rows(soup):
 
         for row in to_remove:
             row.decompose()
+
+        _merge_pdf_table_cols(table)
+
+
+def _merge_pdf_table_cols(table):
+    rows = table.find_all('tr')
+    if not rows:
+        return
+
+    changed = True
+    while changed:
+        changed = False
+        num_cols = max(len(r.find_all(['th', 'td'])) for r in rows)
+        if num_cols < 4:
+            break
+
+        for ci in range(num_cols - 1, 0, -1):
+            col_data = []
+            for row in rows:
+                cells = row.find_all(['th', 'td'])
+                col_data.append(cells[ci].get_text().strip() if ci < len(cells) else '')
+
+            all_empty = all(not v for v in col_data)
+            if all_empty:
+                for row in rows:
+                    cells = row.find_all(['th', 'td'])
+                    if ci < len(cells):
+                        cells[ci].decompose()
+                changed = True
+                continue
+
+            prev_col_data = []
+            for row in rows:
+                cells = row.find_all(['th', 'td'])
+                prev_col_data.append(cells[ci - 1].get_text().strip() if ci - 1 < len(cells) else '')
+
+            curr_filled = sum(1 for v in col_data if v)
+            prev_filled = sum(1 for v in prev_col_data if v)
+            if curr_filled < prev_filled and curr_filled <= len(rows) * 0.4:
+                for row in rows:
+                    cells = row.find_all(['th', 'td'])
+                    if ci < len(cells):
+                        t = cells[ci].get_text().strip()
+                        if t and ci - 1 < len(cells):
+                            prev_t = cells[ci - 1].get_text().strip()
+                            if prev_t and prev_t.endswith('-'):
+                                cells[ci - 1].string = prev_t + t
+                            elif prev_t:
+                                cells[ci - 1].string = prev_t + ' ' + t
+                            else:
+                                cells[ci - 1].string = t
+                        cells[ci].decompose()
+                changed = True
 
 
 def _build_pdf_toc(doc, reader_html):

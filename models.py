@@ -312,6 +312,7 @@ DEFAULTS = {
     'tts_engine': 'edge',
     'edge_voice': 'en-US-AriaNeural',
     'say_voice': 'Samantha',  # Download Siri voices from System Settings > Accessibility > Spoken Content
+    'pdf_tables': 'off',
 }
 
 
