@@ -12,7 +12,7 @@ from pysbd import Segmenter
 from audio import generate_audio_background, cancel_generation, is_generating
 from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences, clean_html_for_reader, inject_sentence_spans
 from models import (
-    init_db, add_item, get_item, get_items, get_recent, get_in_progress,
+    init_db, add_item, find_duplicate, get_item, get_items, get_recent, get_in_progress,
     search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
     item_images_dir, create_collection, get_collections, add_to_collection,
     remove_from_collection, delete_collection,
@@ -148,9 +148,15 @@ def library_audio(item_id):
 
 @app.route('/api/import/file', methods=['POST'])
 def import_file():
-    file_path = (request.json or {}).get('path', '')
+    body = request.json or {}
+    file_path = body.get('path', '')
     if not os.path.isfile(file_path):
         return jsonify({'error': 'File not found'}), 404
+
+    if not body.get('force'):
+        existing = find_duplicate(original_path=file_path)
+        if existing:
+            return jsonify({'error': 'duplicate', 'existing': existing}), 409
 
     import uuid
     placeholder = f'tmp_{uuid.uuid4().hex[:12]}'
@@ -202,9 +208,15 @@ def import_file():
 
 @app.route('/api/import/url', methods=['POST'])
 def import_url():
-    url = (request.json or {}).get('url', '').strip()
+    body = request.json or {}
+    url = body.get('url', '').strip()
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
+
+    if not body.get('force'):
+        existing = find_duplicate(source_url=url)
+        if existing:
+            return jsonify({'error': 'duplicate', 'existing': existing}), 409
 
     import urllib.request
     import tempfile

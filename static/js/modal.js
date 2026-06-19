@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { toastSuccess } from './toast.js';
+import { toastSuccess, toastError } from './toast.js';
 import { escHtml } from './utils.js';
 
 const backdrop = document.getElementById('import-modal');
@@ -43,16 +43,28 @@ function close() {
   backdrop.classList.remove('is-visible');
 }
 
+async function importWithDuplicateCheck(path, body) {
+  let data = await api(path, { body, showError: false });
+  if (data.error === 'duplicate') {
+    const title = data.existing?.title || 'an existing item';
+    if (!confirm(`This item already exists as "${title}". Import anyway?`)) return null;
+    data = await api(path, { body: { ...body, force: true } });
+  } else if (data.error) {
+    toastError(data.error);
+  }
+  return data;
+}
+
 async function importUrl() {
   const url = document.getElementById('import-url').value.trim();
   if (!url) return;
   const btn = document.getElementById('import-url-btn');
   btn.textContent = 'Importing...';
   btn.disabled = true;
-  const data = await api('/api/import/url', { body: { url } });
+  const data = await importWithDuplicateCheck('/api/import/url', { url });
   btn.textContent = 'Import Article';
   btn.disabled = false;
-  if (data.error) return;
+  if (!data || data.error) return;
   document.getElementById('import-url').value = '';
   close();
   onImported?.(data.item_id);
@@ -61,8 +73,8 @@ async function importUrl() {
 async function importFile() {
   const path = document.getElementById('import-file-path').value.trim();
   if (!path) return;
-  const data = await api('/api/import/file', { body: { path } });
-  if (data.error) return;
+  const data = await importWithDuplicateCheck('/api/import/file', { path });
+  if (!data || data.error) return;
   document.getElementById('import-file-path').value = '';
   close();
   onImported?.(data.item_id);
@@ -82,7 +94,8 @@ async function scanFolder() {
     el.querySelector('button').addEventListener('click', async (e) => {
       const btn = e.target;
       btn.textContent = '...';
-      const res = await api('/api/import/file', { body: { path: f.path } });
+      const res = await importWithDuplicateCheck('/api/import/file', { path: f.path });
+      if (!res) { btn.textContent = 'Import'; return; }
       if (res.error) { btn.textContent = 'Error'; return; }
       btn.textContent = 'Done';
       btn.classList.add('is-done');

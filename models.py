@@ -109,6 +109,25 @@ def add_item(title, source_type, text_content, sentences, source_url=None, origi
     return item_id
 
 
+def find_duplicate(source_url=None, original_path=None):
+    if not source_url and not original_path:
+        return None
+    with get_db() as db:
+        if source_url:
+            row = db.execute(
+                'SELECT id, title FROM items WHERE source_url = ? LIMIT 1', (source_url,)
+            ).fetchone()
+            if row:
+                return dict(row)
+        if original_path:
+            row = db.execute(
+                'SELECT id, title FROM items WHERE original_path = ? LIMIT 1', (original_path,)
+            ).fetchone()
+            if row:
+                return dict(row)
+    return None
+
+
 def update_item_audio(item_id, timeline, total_duration_ms):
     with get_db() as db:
         db.execute(
