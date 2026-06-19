@@ -41,6 +41,8 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
     reader_html = doc.summary()
 
     soup = BeautifulSoup(reader_html, 'html.parser')
+    for tag in soup.find_all(True):
+        tag.attrs = {k: v for k, v in tag.attrs.items() if v}
     for img in soup.find_all('img'):
         src = img.get('src', '')
         if src:
