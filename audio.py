@@ -2,9 +2,12 @@ import os
 import subprocess
 import threading
 import wave
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from models import item_audio_dir, item_master_wav, update_item_audio, delete_item
+
+TTS_WORKERS = 4
 
 
 @dataclass
@@ -18,34 +21,45 @@ _active_jobs: dict[int, threading.Event] = {}
 _jobs_lock = threading.Lock()
 
 
+def _generate_sentence_wav(i, text, audio_dir, cancel_event):
+    if cancel_event.is_set():
+        return i, 0
+    sent_wav = os.path.join(audio_dir, f'sent_{i:04d}.wav')
+    try:
+        subprocess.run(
+            ['say', '-o', sent_wav, '--file-format=WAVE', '--data-format=LEI16@22050', text],
+            check=True, capture_output=True, timeout=60,
+        )
+        return i, _wav_duration_ms(sent_wav)
+    except Exception as e:
+        print(f"Failed to generate sentence {i}: {e}")
+        return i, 0
+
+
 def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None):
     audio_dir = item_audio_dir(item_id)
     os.makedirs(audio_dir, exist_ok=True)
 
-    timestamps = []
-    cumulative_ms = 0
+    durations = [0.0] * len(sentences)
+    completed = 0
+    progress_lock = threading.Lock()
 
-    for i, text in enumerate(sentences):
-        if cancel_event.is_set():
-            _cleanup_partial(audio_dir, i)
-            return None, 0
-
-        sent_wav = os.path.join(audio_dir, f'sent_{i:04d}.wav')
-        try:
-            subprocess.run(
-                ['say', '-o', sent_wav, '--file-format=WAVE', '--data-format=LEI16@22050', text],
-                check=True, capture_output=True, timeout=60,
-            )
-            duration_ms = _wav_duration_ms(sent_wav)
-        except Exception as e:
-            print(f"Failed to generate sentence {i}: {e}")
-            duration_ms = 0
-
-        timestamps.append(SentenceTimestamp(index=i, start_ms=cumulative_ms, duration_ms=duration_ms))
-        cumulative_ms += duration_ms
-
-        if on_progress:
-            on_progress(i + 1, len(sentences))
+    with ThreadPoolExecutor(max_workers=TTS_WORKERS) as pool:
+        futures = {
+            pool.submit(_generate_sentence_wav, i, text, audio_dir, cancel_event): i
+            for i, text in enumerate(sentences)
+        }
+        for future in as_completed(futures):
+            if cancel_event.is_set():
+                pool.shutdown(wait=False, cancel_futures=True)
+                _cleanup_partial(audio_dir, len(sentences))
+                return None, 0
+            idx, dur = future.result()
+            durations[idx] = dur
+            with progress_lock:
+                completed += 1
+                if on_progress:
+                    on_progress(completed, len(sentences))
 
     if cancel_event.is_set():
         _cleanup_partial(audio_dir, len(sentences))
@@ -53,6 +67,12 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None):
 
     master_path = item_master_wav(item_id)
     _concatenate_wavs(audio_dir, len(sentences), master_path)
+
+    timestamps = []
+    cumulative_ms = 0
+    for i, dur in enumerate(durations):
+        timestamps.append(SentenceTimestamp(index=i, start_ms=cumulative_ms, duration_ms=dur))
+        cumulative_ms += dur
 
     for i in range(len(sentences)):
         sent_wav = os.path.join(audio_dir, f'sent_{i:04d}.wav')
