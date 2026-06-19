@@ -194,7 +194,13 @@ def import_url():
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
-    downloaded = trafilatura.fetch_url(url)
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            downloaded = resp.read().decode('utf-8', errors='ignore')
+    except Exception as e:
+        return jsonify({'error': f'Could not download page: {e}'}), 400
     if not downloaded:
         return jsonify({'error': 'Could not download page'}), 400
 
@@ -206,6 +212,12 @@ def import_url():
             title = meta.get('title', url) or url
     except (ValueError, TypeError):
         pass
+    if title == url:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(downloaded, 'html.parser')
+        title_tag = soup.find('title')
+        if title_tag and title_tag.string:
+            title = title_tag.string.strip()
 
     text_only = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
     if not text_only or not text_only.strip():
