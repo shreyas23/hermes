@@ -63,8 +63,21 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
 
     doc = Document(str(orig_soup))
     reader_html = doc.summary()
+    doc_title = doc.title()
+    if doc_title == '[no-title]':
+        doc_title = None
 
     soup = BeautifulSoup(reader_html, 'html.parser')
+
+    # Re-add title that readability extracts separately
+    if doc_title:
+        content = soup.find('div') or soup
+        first_child = content.find()
+        if first_child:
+            h1 = soup.new_tag('h1')
+            h1.string = doc_title
+            first_child.insert_before(h1)
+
     for tag in soup.find_all(True):
         tag.attrs = {k: v for k, v in tag.attrs.items() if v}
     for img in soup.find_all('img'):
