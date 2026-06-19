@@ -180,7 +180,8 @@ def _wrap_sentence_range(soup, si, block, sc, s_off, ec, e_off):
             for node in to_wrap:
                 span.append(node.extract())
             return True
-    except Exception:
+    except Exception as e:
+        print(f"Warning: failed to wrap sentence {si}: {e}")
         return False
     return False
 
@@ -351,6 +352,7 @@ def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> 
     blocks = []
     char_offset = 0
 
+    img_count = 0
     for el in body.descendants:
         if el.name == 'img':
             src = el.get('src', '')
@@ -360,9 +362,10 @@ def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> 
             alt = el.get('alt', '')
             img_entry = {'type': 'image', 'src': src, 'alt': alt, 'char_offset': char_offset}
             if image_dir:
-                local = _download_image(src, image_dir, len([b for b in blocks if b['type'] == 'image']))
+                local = _download_image(src, image_dir, img_count)
                 if local:
                     img_entry['filename'] = local
+            img_count += 1
             blocks.append(img_entry)
         elif el.string and el.parent.name not in ('script', 'style', 'img'):
             text = el.string.strip()
@@ -400,13 +403,37 @@ def map_images_to_sentences(images: list, text: str, sentences: list) -> list:
     return mapped
 
 
+def _is_safe_url(url: str) -> bool:
+    from urllib.parse import urlparse
+    import socket
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        return False
+    hostname = parsed.hostname or ''
+    try:
+        ip = socket.gethostbyname(hostname)
+        import ipaddress
+        addr = ipaddress.ip_address(ip)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return False
+    except (socket.gaierror, ValueError):
+        return False
+    return True
+
+
 def _download_image(url: str, image_dir: str, index: int) -> str | None:
     import urllib.request
+    if not _is_safe_url(url):
+        return None
     try:
         ext = _guess_image_ext(url)
         filename = f'img_{index}{ext}'
         filepath = os.path.join(image_dir, filename)
-        urllib.request.urlretrieve(url, filepath)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = resp.read(5 * 1024 * 1024)
+            with open(filepath, 'wb') as f:
+                f.write(data)
         if os.path.getsize(filepath) < 100:
             os.unlink(filepath)
             return None
@@ -472,42 +499,224 @@ def _extract_html(path: str, image_dir: str = None) -> dict:
 
 def _extract_pdf(path: str, image_dir: str = None) -> dict:
     import pymupdf
-    doc = pymupdf.open(path)
-    pages = []
-    images = []
-    char_offset = 0
+    from pymupdf4llm.helpers.pymupdf_rag import TocHeaders, to_markdown as p4l_to_markdown
 
-    for page_num, page in enumerate(doc):
-        text = page.get_text()
-        if text and text.strip():
-            pages.append(text.strip())
+    with pymupdf.open(path) as doc:
+        hdr_info = TocHeaders(doc)
+        md = p4l_to_markdown(doc, hdr_info=hdr_info)
+        toc_titles = [title for _, title, _ in doc.get_toc()]
+        md = _clean_pdf_markdown(md, toc_titles)
+        reader_html = _pdf_md_to_html(md)
+        toc = _build_pdf_toc(doc, reader_html)
 
+        from bs4 import BeautifulSoup, NavigableString
+        soup = BeautifulSoup(reader_html, 'html.parser')
+        for tag in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'tr']):
+            tag.insert_before(NavigableString('\n\n'))
+        flat_text = soup.get_text()
+        flat_text = re.sub(r'[ \t]+', ' ', flat_text)
+        flat_text = re.sub(r'\n{3,}', '\n\n', flat_text)
+        flat_text = flat_text.strip()
+
+        images = []
         if image_dir:
-            for i, img in enumerate(page.get_images(full=True)):
-                try:
-                    xref = img[0]
-                    pix = pymupdf.Pixmap(doc, xref)
-                    if pix.n > 4:
-                        pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
-                    filename = f'img_p{page_num}_{i}.png'
-                    pix.save(os.path.join(image_dir, filename))
-                    if os.path.getsize(os.path.join(image_dir, filename)) > 500:
-                        images.append({
-                            'type': 'image',
-                            'filename': filename,
-                            'alt': f'Page {page_num + 1} image',
-                            'char_offset': char_offset + len(text or '') // 2,
-                        })
-                except Exception:
-                    pass
+            char_offset = 0
+            for page_num, page in enumerate(doc):
+                page_text = page.get_text()
+                for i, img in enumerate(page.get_images(full=True)):
+                    try:
+                        xref = img[0]
+                        pix = pymupdf.Pixmap(doc, xref)
+                        if pix.n > 4:
+                            pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+                        filename = f'img_p{page_num}_{i}.png'
+                        pix.save(os.path.join(image_dir, filename))
+                        if os.path.getsize(os.path.join(image_dir, filename)) > 500:
+                            images.append({
+                                'type': 'image',
+                                'filename': filename,
+                                'alt': f'Page {page_num + 1} image',
+                                'char_offset': char_offset + len(page_text or '') // 2,
+                            })
+                    except Exception:
+                        pass
+                char_offset += len(page_text or '') + 2
+            total_chars = char_offset or 1
+            for img in images:
+                img['total_chars'] = total_chars
 
-        char_offset += len(text or '') + 2
+    return {'text': flat_text, 'images': images, 'reader_html': reader_html, 'toc': toc}
 
-    doc.close()
-    total_chars = char_offset or 1
-    for img in images:
-        img['total_chars'] = total_chars
-    return {'text': '\n\n'.join(pages), 'images': images}
+
+def _clean_pdf_markdown(md, toc_titles=None):
+    lines = md.split('\n')
+    result = []
+    skip_toc = False
+
+    toc_set = set()
+    if toc_titles:
+        for t in toc_titles:
+            toc_set.add(re.sub(r'\s+', ' ', t.strip().lower()))
+
+    for line in lines:
+        stripped = line.strip()
+
+        if re.match(r'^(?:#{1,6}\s+)?\*?\*?Contents\*?\*?\s*$', stripped, re.IGNORECASE):
+            skip_toc = True
+            continue
+        if skip_toc:
+            if re.match(r'^#{1,6}\s', stripped):
+                skip_toc = False
+            elif toc_set and stripped:
+                text_clean = re.sub(r'[_*]', '', stripped).strip()
+                norm = re.sub(r'\s+', ' ', text_clean.lower())
+                if norm in toc_set and len(text_clean) < 80:
+                    skip_toc = False
+                else:
+                    continue
+            else:
+                continue
+
+        if stripped.count('_') >= 6 and re.search(r'\d+$', stripped):
+            continue
+
+        if stripped.isdigit() and len(stripped) <= 3:
+            continue
+
+        if stripped.startswith('=== '):
+            continue
+
+        if toc_set and not re.match(r'^#{1,6}\s', stripped) and stripped:
+            text_clean = re.sub(r'[_*]', '', stripped).strip()
+            norm = re.sub(r'\s+', ' ', text_clean.lower())
+            if norm in toc_set and len(text_clean) < 80:
+                level = 1
+                if re.match(r'^\d+\.\d+\.\d+', text_clean):
+                    level = 3
+                elif re.match(r'^\d+\.\d+', text_clean):
+                    level = 2
+                result.append(f'{"#" * level} {stripped}')
+                continue
+
+        result.append(line)
+
+    return '\n'.join(result)
+
+
+def _pdf_md_to_html(md):
+    import markdown as md_lib
+    from bs4 import BeautifulSoup
+
+    cleaned_lines = []
+    for line in md.split('\n'):
+        m = re.match(r'^(#{1,6})\s+.*?\d+\s+(\*\*\d+[\s.]+.+)', line)
+        if m:
+            cleaned_lines.append(f'{m.group(1)} {m.group(2)}')
+        else:
+            cleaned_lines.append(line)
+    md = '\n'.join(cleaned_lines)
+
+    html = md_lib.markdown(md, extensions=['tables'])
+
+    soup = BeautifulSoup(html, 'html.parser')
+    counter = 0
+    for h in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        counter += 1
+        h['id'] = f'h-{counter}'
+        for strong in h.find_all('strong'):
+            strong.unwrap()
+
+    _merge_pdf_table_rows(soup)
+
+    return str(soup)
+
+
+def _merge_pdf_table_rows(soup):
+    for table in soup.find_all('table'):
+        rows = table.find_all('tr')
+        if len(rows) < 2:
+            continue
+
+        for row in rows:
+            cells = row.find_all(['th', 'td'])
+            for i, cell in enumerate(cells):
+                t = cell.get_text().strip()
+                if re.match(r'^Col\d+$', t):
+                    cell.string = ''
+                if i > 0:
+                    prev_t = cells[i - 1].get_text().strip()
+                    if t and t == prev_t:
+                        cell.string = ''
+
+        prev_row = None
+        to_remove = []
+
+        for row in rows:
+            cells = row.find_all(['th', 'td'])
+            texts = [c.get_text().strip() for c in cells]
+            empty_count = sum(1 for t in texts if not t)
+            first = texts[0] if texts else ''
+
+            prev_first = ''
+            if prev_row is not None:
+                pc = prev_row.find(['th', 'td'])
+                if pc:
+                    prev_first = pc.get_text().strip()
+
+            is_continuation = (
+                prev_row is not None and (
+                    empty_count > len(cells) / 2 or
+                    (first and first[0].islower()) or
+                    (prev_first and prev_first.endswith('-'))
+                )
+            )
+
+            if is_continuation:
+                prev_cells = prev_row.find_all(['th', 'td'])
+                for i, cell in enumerate(cells):
+                    t = cell.get_text().strip()
+                    if t and i < len(prev_cells):
+                        prev_t = prev_cells[i].get_text().strip()
+                        if prev_t and prev_t.endswith('-'):
+                            prev_cells[i].string = prev_t + t
+                        elif prev_t:
+                            prev_cells[i].string = prev_t + ' ' + t
+                        else:
+                            prev_cells[i].string = t
+                to_remove.append(row)
+            else:
+                prev_row = row
+
+        for row in to_remove:
+            row.decompose()
+
+
+def _build_pdf_toc(doc, reader_html):
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(reader_html, 'html.parser')
+    headings = []
+    for h in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        hid = h.get('id')
+        text = h.get_text().strip()
+        stripped = re.sub(r'^\d+(\.\d+)*\s+', '', text).strip()
+        headings.append((hid, text.lower(), stripped.lower()))
+
+    toc = []
+    used_ids = set()
+    for level, title, _page in doc.get_toc():
+        entry = {'level': min(level, 3), 'title': title.strip()}
+        title_lower = title.strip().lower()
+        for hid, full, stripped in headings:
+            if hid in used_ids:
+                continue
+            if title_lower == full or title_lower == stripped or stripped.startswith(title_lower):
+                entry['id'] = hid
+                used_ids.add(hid)
+                break
+        toc.append(entry)
+
+    return toc
 
 
 def _extract_docx(path: str, image_dir: str = None) -> dict:

@@ -55,7 +55,7 @@ def init_db():
                 PRIMARY KEY (collection_id, item_id)
             );
         ''')
-        for col in ['images TEXT', 'reader_html TEXT']:
+        for col in ['images TEXT', 'reader_html TEXT', 'toc TEXT']:
             try:
                 db.execute(f'ALTER TABLE items ADD COLUMN {col}')
             except sqlite3.OperationalError:
@@ -73,7 +73,7 @@ def init_db():
 def get_db():
     conn = getattr(_local, 'conn', None)
     if conn is None:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA foreign_keys = ON')
         conn.execute('PRAGMA journal_mode = WAL')
@@ -86,15 +86,23 @@ def get_db():
         raise
 
 
-def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None, reader_html=None):
+def close_db():
+    conn = getattr(_local, 'conn', None)
+    if conn is not None:
+        conn.close()
+        _local.conn = None
+
+
+def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None, reader_html=None, toc=None):
     now = time.time()
     with get_db() as db:
         cur = db.execute(
             '''INSERT INTO items (title, source_type, source_url, original_path,
-               text_content, sentences, images, reader_html, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+               text_content, sentences, images, reader_html, toc, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (title, source_type, source_url, original_path,
-             text_content, json.dumps(sentences), json.dumps(images or []), reader_html, now, now)
+             text_content, json.dumps(sentences), json.dumps(images or []),
+             reader_html, json.dumps(toc) if toc else None, now, now)
         )
         item_id = cur.lastrowid
         db.execute('INSERT INTO progress (item_id) VALUES (?)', (item_id,))
@@ -115,6 +123,7 @@ def _hydrate_row(row):
     item['sentences'] = json.loads(item['sentences'])
     item['timeline'] = json.loads(item['timeline']) if item['timeline'] else None
     item['images'] = json.loads(item['images']) if item.get('images') else []
+    item['toc'] = json.loads(item['toc']) if item.get('toc') else None
     item['progress'] = {
         'current_sentence': row['p_current_sentence'],
         'current_time_ms': row['p_current_time_ms'],
@@ -205,10 +214,11 @@ def get_recent(limit=20):
 
 
 def search_items(query):
+    escaped = query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     with get_db() as db:
         rows = db.execute(
-            f'{_ITEMS_SUMMARY} WHERE i.title LIKE ? ORDER BY i.created_at DESC',
-            (f'%{query}%',)
+            f"{_ITEMS_SUMMARY} WHERE i.title LIKE ? ESCAPE '\\' ORDER BY i.created_at DESC",
+            (f'%{escaped}%',)
         ).fetchall()
         return [_hydrate_summary(r) for r in rows]
 

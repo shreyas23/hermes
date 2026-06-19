@@ -80,10 +80,11 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
                 async with sem:
                     idx, dur = await _generate_sentence_wav_edge(i, text, audio_dir, cancel_event, voice)
                     durations[idx] = dur
-                    completed += 1
-                    if on_progress:
-                        on_progress(completed, len(sentences))
-            await asyncio.gather(*[gen(i, t) for i, t in enumerate(sentences)])
+                    with progress_lock:
+                        completed += 1
+                        if on_progress:
+                            on_progress(completed, len(sentences))
+            await asyncio.gather(*[gen(i, t) for i, t in enumerate(sentences)], return_exceptions=True)
         asyncio.run(run_edge())
     else:
         with ThreadPoolExecutor(max_workers=TTS_WORKERS) as pool:
@@ -112,7 +113,8 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
 
     m4a_path = item_master_m4a(item_id)
     _convert_to_m4a(wav_path, m4a_path)
-    os.unlink(wav_path)
+    if os.path.isfile(m4a_path) and os.path.getsize(m4a_path) > 0:
+        os.unlink(wav_path)
 
     timestamps = []
     cumulative_ms = 0
@@ -157,13 +159,20 @@ def generate_audio_background(item_id, sentences, on_progress=None, on_complete=
     return thread
 
 
-def cancel_generation(item_id):
+def cancel_generation(item_id, wait=False):
     with _jobs_lock:
         event = _active_jobs.get(item_id)
-        if event:
-            event.set()
-            return True
-    return False
+        if not event:
+            return False
+        event.set()
+    if wait:
+        for _ in range(100):
+            import time
+            time.sleep(0.1)
+            with _jobs_lock:
+                if item_id not in _active_jobs:
+                    break
+    return True
 
 
 def is_generating(item_id):
@@ -194,14 +203,19 @@ def _convert_to_m4a(wav_path, m4a_path):
 
 
 def _concatenate_wavs(audio_dir, count, output_path):
+    params_set = False
     with wave.open(output_path, 'wb') as out:
         for i in range(count):
             sent_path = os.path.join(audio_dir, f'sent_{i:04d}.wav')
             if not os.path.exists(sent_path):
+                if params_set:
+                    # 100ms silence at 22050Hz 16-bit mono
+                    out.writeframes(b'\x00' * (22050 * 2 // 10))
                 continue
             with wave.open(sent_path, 'rb') as inp:
-                if i == 0:
+                if not params_set:
                     out.setparams(inp.getparams())
+                    params_set = True
                 out.writeframes(inp.readframes(inp.getnframes()))
 
 

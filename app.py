@@ -85,7 +85,7 @@ def library_item(item_id):
 
 @app.route('/api/library/<int:item_id>', methods=['DELETE'])
 def library_delete(item_id):
-    cancel_generation(item_id)
+    cancel_generation(item_id, wait=True)
     delete_item(item_id)
     return jsonify({'deleted': True})
 
@@ -101,7 +101,7 @@ def library_cancel(item_id):
 
 @app.route('/api/library/<int:item_id>/progress', methods=['POST'])
 def library_progress(item_id):
-    data = request.json
+    data = request.json or {}
     update_progress(
         item_id,
         data.get('current_sentence', 0),
@@ -125,7 +125,9 @@ def library_retry(item_id):
 @app.route('/api/library/<int:item_id>/images/<path:filename>')
 def library_image(item_id, filename):
     img_dir = item_images_dir(item_id)
-    filepath = os.path.join(img_dir, filename)
+    filepath = os.path.realpath(os.path.join(img_dir, filename))
+    if not filepath.startswith(os.path.realpath(img_dir) + os.sep):
+        return jsonify({'error': 'Invalid path'}), 403
     if not os.path.isfile(filepath):
         return jsonify({'error': 'Image not found'}), 404
     return send_file(filepath)
@@ -146,43 +148,53 @@ def library_audio(item_id):
 
 @app.route('/api/import/file', methods=['POST'])
 def import_file():
-    file_path = request.json.get('path', '')
+    file_path = (request.json or {}).get('path', '')
     if not os.path.isfile(file_path):
         return jsonify({'error': 'File not found'}), 404
 
-    item_id_placeholder = int(time.time() * 1000) % 1000000
-    img_dir = item_images_dir(item_id_placeholder)
+    import uuid
+    placeholder = f'tmp_{uuid.uuid4().hex[:12]}'
+    img_dir = item_images_dir(placeholder)
     os.makedirs(img_dir, exist_ok=True)
 
-    result = extract_with_images(file_path, img_dir)
-    if not result or not result['text'].strip():
-        return jsonify({'error': 'Could not extract text'}), 400
+    try:
+        result = extract_with_images(file_path, img_dir)
+        if not result or not result['text'].strip():
+            return jsonify({'error': 'Could not extract text'}), 400
 
-    text = result['text']
-    title = Path(file_path).stem
-    sentences = _split(text)
-    images = map_images_to_sentences(result.get('images', []), text, sentences)
+        text = result['text']
+        title = Path(file_path).stem
+        sentences = _split(text)
+        if not sentences:
+            return jsonify({'error': 'No extractable text'}), 400
+        images = map_images_to_sentences(result.get('images', []), text, sentences)
 
-    item_id = add_item(
-        title=title,
-        source_type='document',
-        text_content=text,
-        sentences=sentences,
-        original_path=file_path,
-        images=images,
-    )
+        reader_html = result.get('reader_html')
+        toc = result.get('toc')
+        if reader_html:
+            reader_html = inject_sentence_spans(reader_html, sentences)
 
-    real_img_dir = item_images_dir(item_id)
-    if img_dir != real_img_dir:
-        if os.path.isdir(img_dir) and os.listdir(img_dir):
-            os.makedirs(real_img_dir, exist_ok=True)
-            for f in os.listdir(img_dir):
-                os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
-        if os.path.isdir(img_dir):
-            try:
-                os.rmdir(img_dir)
-            except OSError:
-                pass
+        item_id = add_item(
+            title=title,
+            source_type='document',
+            text_content=text,
+            sentences=sentences,
+            original_path=file_path,
+            images=images,
+            reader_html=reader_html,
+            toc=toc,
+        )
+
+        real_img_dir = item_images_dir(item_id)
+        if img_dir != real_img_dir:
+            if os.path.isdir(img_dir) and os.listdir(img_dir):
+                os.makedirs(real_img_dir, exist_ok=True)
+                for f in os.listdir(img_dir):
+                    os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+            _rmdir_safe(img_dir)
+    except Exception:
+        _rmdir_safe(img_dir)
+        raise
 
     _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
@@ -190,17 +202,20 @@ def import_file():
 
 @app.route('/api/import/url', methods=['POST'])
 def import_url():
-    url = request.json.get('url', '').strip()
+    url = (request.json or {}).get('url', '').strip()
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
     import urllib.request
     import tempfile
+    MAX_DOWNLOAD = 50 * 1024 * 1024
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'})
         with urllib.request.urlopen(req, timeout=30) as resp:
             content_type = resp.headers.get('Content-Type', '').lower()
-            raw_bytes = resp.read()
+            raw_bytes = resp.read(MAX_DOWNLOAD + 1)
+            if len(raw_bytes) > MAX_DOWNLOAD:
+                return jsonify({'error': 'File too large (max 50MB)'}), 400
     except Exception as e:
         return jsonify({'error': f'Could not download page: {e}'}), 400
     if not raw_bytes:
@@ -213,46 +228,62 @@ def import_url():
             tmp.write(raw_bytes)
             tmp_path = tmp.name
         try:
-            item_id_placeholder = int(time.time() * 1000) % 1000000
-            img_dir = item_images_dir(item_id_placeholder)
+            import uuid
+            placeholder = f'tmp_{uuid.uuid4().hex[:12]}'
+            img_dir = item_images_dir(placeholder)
             os.makedirs(img_dir, exist_ok=True)
 
-            result = extract_with_images(tmp_path, img_dir)
-            if not result or not result['text'].strip():
-                return jsonify({'error': 'Could not extract text from PDF'}), 400
+            try:
+                result = extract_with_images(tmp_path, img_dir)
+                if not result or not result['text'].strip():
+                    return jsonify({'error': 'Could not extract text from PDF'}), 400
 
-            text = result['text']
-            title = Path(url.split('?')[0].split('/')[-1]).stem or url
-            sentences = _split(text)
-            images = map_images_to_sentences(result.get('images', []), text, sentences)
+                text = result['text']
+                title = Path(url.split('?')[0].split('/')[-1]).stem or url
+                sentences = _split(text)
+                if not sentences:
+                    return jsonify({'error': 'No extractable text'}), 400
+                images = map_images_to_sentences(result.get('images', []), text, sentences)
 
-            item_id = add_item(
-                title=title,
-                source_type='document',
-                text_content=text,
-                sentences=sentences,
-                source_url=url,
-                images=images,
-            )
+                reader_html = result.get('reader_html')
+                toc = result.get('toc')
+                if reader_html:
+                    reader_html = inject_sentence_spans(reader_html, sentences)
 
-            real_img_dir = item_images_dir(item_id)
-            if img_dir != real_img_dir:
-                if os.path.isdir(img_dir) and os.listdir(img_dir):
-                    os.makedirs(real_img_dir, exist_ok=True)
-                    for f in os.listdir(img_dir):
-                        os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
-                if os.path.isdir(img_dir):
-                    try:
-                        os.rmdir(img_dir)
-                    except OSError:
-                        pass
+                item_id = add_item(
+                    title=title,
+                    source_type='document',
+                    text_content=text,
+                    sentences=sentences,
+                    source_url=url,
+                    images=images,
+                    reader_html=reader_html,
+                    toc=toc,
+                )
+
+                real_img_dir = item_images_dir(item_id)
+                if img_dir != real_img_dir:
+                    if os.path.isdir(img_dir) and os.listdir(img_dir):
+                        os.makedirs(real_img_dir, exist_ok=True)
+                        for f in os.listdir(img_dir):
+                            os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+                    _rmdir_safe(img_dir)
+            except Exception:
+                _rmdir_safe(img_dir)
+                raise
 
             _start_generation(item_id, sentences)
             return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
         finally:
             os.unlink(tmp_path)
 
-    downloaded = raw_bytes.decode('utf-8', errors='ignore')
+    import cgi
+    _, params = cgi.parse_header(content_type)
+    charset = params.get('charset', 'utf-8')
+    try:
+        downloaded = raw_bytes.decode(charset)
+    except (UnicodeDecodeError, LookupError):
+        downloaded = raw_bytes.decode('utf-8', errors='replace')
 
     reader_html, title = clean_html_for_reader(downloaded, url)
     title = title or url
@@ -265,6 +296,8 @@ def import_url():
         return jsonify({'error': 'Could not extract article text'}), 400
 
     sentences = _split(text_only)
+    if not sentences:
+        return jsonify({'error': 'No extractable text'}), 400
     reader_html = inject_sentence_spans(reader_html, sentences)
 
     item_id = add_item(
@@ -282,12 +315,15 @@ def import_url():
 
 @app.route('/api/import/text', methods=['POST'])
 def import_text():
-    title = request.json.get('title', 'Untitled').strip()
-    text = request.json.get('text', '').strip()
+    data = request.json or {}
+    title = data.get('title', 'Untitled').strip()
+    text = data.get('text', '').strip()
     if not text:
         return jsonify({'error': 'No text provided'}), 400
 
     sentences = _split(text)
+    if not sentences:
+        return jsonify({'error': 'No extractable text'}), 400
 
     item_id = add_item(
         title=title,
@@ -302,7 +338,7 @@ def import_text():
 
 @app.route('/api/import/folder', methods=['POST'])
 def import_folder():
-    folder = request.json.get('folder', '')
+    folder = (request.json or {}).get('folder', '')
     folder = os.path.expanduser(folder)
     if not os.path.isdir(folder):
         return jsonify({'error': 'Not a valid directory'}), 400
@@ -324,7 +360,7 @@ def list_collections():
 
 @app.route('/api/collections', methods=['POST'])
 def new_collection():
-    name = request.json.get('name', '').strip()
+    name = (request.json or {}).get('name', '').strip()
     if not name:
         return jsonify({'error': 'Name required'}), 400
     cid = create_collection(name)
@@ -339,7 +375,7 @@ def del_collection(cid):
 
 @app.route('/api/collections/<int:cid>/items', methods=['POST'])
 def collection_add(cid):
-    item_id = request.json.get('item_id')
+    item_id = (request.json or {}).get('item_id')
     add_to_collection(cid, item_id)
     return jsonify({'added': True})
 
@@ -357,26 +393,37 @@ def settings_get():
     return jsonify(get_all_settings())
 
 
+_ALLOWED_SETTINGS = {'tts_engine', 'edge_voice', 'say_voice', 'theme'}
+
 @app.route('/api/settings', methods=['POST'])
 def settings_update():
-    data = request.json
+    data = request.json or {}
     for key, value in data.items():
-        set_setting(key, value)
+        if key in _ALLOWED_SETTINGS:
+            set_setting(key, value)
     return jsonify(get_all_settings())
 
 
+_edge_voices_cache = []
+
 @app.route('/api/voices', methods=['GET'])
 def voices_list():
+    global _edge_voices_cache
     engine = request.args.get('engine', 'edge')
     if engine == 'edge':
-        import asyncio
-        import edge_tts
-        async def fetch():
-            return await edge_tts.list_voices()
-        all_voices = asyncio.run(fetch())
-        voices = [{'id': v['ShortName'], 'name': v['ShortName'], 'gender': v['Gender'], 'locale': v['Locale']}
-                  for v in all_voices if v['Locale'].startswith('en-')]
-        return jsonify({'voices': voices})
+        if not _edge_voices_cache:
+            import asyncio
+            import edge_tts
+            loop = asyncio.new_event_loop()
+            try:
+                all_voices = loop.run_until_complete(edge_tts.list_voices())
+            finally:
+                loop.close()
+            _edge_voices_cache = [
+                {'id': v['ShortName'], 'name': v['ShortName'], 'gender': v['Gender'], 'locale': v['Locale']}
+                for v in all_voices if v['Locale'].startswith('en-')
+            ]
+        return jsonify({'voices': _edge_voices_cache})
     else:
         import subprocess
         out = subprocess.run(['say', '-v', '?'], capture_output=True, text=True)
@@ -415,6 +462,19 @@ def events():
 
 
 # --- Helpers ---
+
+def _rmdir_safe(path):
+    if os.path.isdir(path):
+        for f in os.listdir(path):
+            try:
+                os.unlink(os.path.join(path, f))
+            except OSError:
+                pass
+        try:
+            os.rmdir(path)
+        except OSError:
+            pass
+
 
 _BLOCK_TAGS = frozenset([
     'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote',

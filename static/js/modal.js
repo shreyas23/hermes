@@ -27,8 +27,10 @@ export function initModal({ onImport }) {
   document.getElementById('import-text-btn').addEventListener('click', importText);
 
   document.addEventListener('keydown', e => {
-    if (e.code === 'Escape' && backdrop.classList.contains('is-visible')) {
-      close();
+    if (e.code === 'Escape') {
+      if (backdrop.classList.contains('is-visible')) close();
+      const settingsModal = document.getElementById('settings-modal');
+      if (settingsModal?.classList.contains('is-visible')) settingsModal.classList.remove('is-visible');
     }
   });
 }

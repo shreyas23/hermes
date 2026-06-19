@@ -121,6 +121,11 @@ body {
 }
 
 .nav__item {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-family);
   padding: var(--space-2) var(--space-4);
   min-height: 36px;
   display: flex;

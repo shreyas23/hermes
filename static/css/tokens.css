@@ -6,7 +6,6 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
-  --space-10: 40px;
   --space-12: 48px;
 
   /* Colors — light theme, Apple-inspired */
@@ -44,7 +43,6 @@
   --text-lg: 17px;
   --text-xl: 20px;
   --text-2xl: 24px;
-  --text-3xl: 28px;
   --font-normal: 400;
   --font-medium: 500;
   --font-semibold: 600;
@@ -69,7 +67,6 @@
 
   /* Layout */
   --sidebar-width: 260px;
-  --controls-height: 96px;
   --mini-player-height: 56px;
   --play-btn-size: 44px;
   --modal-width: 480px;

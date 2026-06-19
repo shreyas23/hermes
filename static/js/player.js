@@ -20,6 +20,7 @@ const miniTime = document.getElementById('mini-time');
 const miniPlay = document.getElementById('mini-play');
 const miniPause = document.getElementById('mini-pause');
 const miniProgressFill = document.getElementById('mini-progress-fill');
+let canplayAbort = null;
 
 export function initPlayer() {
   btnPlay.addEventListener('click', play);
@@ -85,7 +86,7 @@ export function initPlayer() {
 
   // Scrubber
   scrubber.addEventListener('mousedown', () => { state.scrubbing = true; });
-  scrubber.addEventListener('touchstart', () => { state.scrubbing = true; });
+  scrubber.addEventListener('touchstart', () => { state.scrubbing = true; }, { passive: true });
 
   scrubber.addEventListener('input', () => {
     const pct = scrubber.value / 10000;
@@ -111,7 +112,11 @@ export function initPlayer() {
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     switch (e.code) {
-      case 'Space': e.preventDefault(); state.playing ? pause() : play(); break;
+      case 'Space':
+        if (!state.currentItem?.audio_ready) return;
+        e.preventDefault();
+        state.playing ? pause() : play();
+        break;
       case 'ArrowLeft': e.preventDefault(); btnPrev.click(); break;
       case 'ArrowRight': e.preventDefault(); btnNext.click(); break;
     }
@@ -121,6 +126,8 @@ export function initPlayer() {
 }
 
 export function loadAudio(item) {
+  if (canplayAbort) canplayAbort.abort();
+
   timeTotal.textContent = formatTime(item.total_duration_ms);
   timeCurrent.textContent = '0:00';
   scrubber.value = 0;
@@ -131,11 +138,11 @@ export function loadAudio(item) {
 
   if (item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished) {
     const resumeMs = item.progress.current_time_ms;
-    state.audio.addEventListener('canplay', function onCanPlay() {
+    canplayAbort = new AbortController();
+    state.audio.addEventListener('canplay', () => {
       state.audio.currentTime = resumeMs / 1000;
       highlightCurrentSentence();
-      state.audio.removeEventListener('canplay', onCanPlay);
-    });
+    }, { once: true, signal: canplayAbort.signal });
   }
 
   updateMiniPlayer();
@@ -214,11 +221,15 @@ function stopTick() {
 }
 
 export function saveProgress() {
-  if (!state.currentItemId || !state.audio.src) return;
-  api(`/api/library/${state.currentItemId}/progress`, {
+  const itemId = state.currentItemId;
+  const src = state.audio.src;
+  if (!itemId || !src) return;
+  const currentSentence = getCurrentSentenceIndex();
+  const currentTimeMs = state.audio.currentTime * 1000;
+  api(`/api/library/${itemId}/progress`, {
     body: {
-      current_sentence: getCurrentSentenceIndex(),
-      current_time_ms: state.audio.currentTime * 1000,
+      current_sentence: currentSentence,
+      current_time_ms: currentTimeMs,
       is_finished: false,
     }
   });

@@ -14,15 +14,28 @@ export async function api(path, opts = {}) {
     return data;
   } catch (e) {
     console.error('API error:', path, e);
-    toastError('Connection error');
+    if (opts.showError !== false) toastError('Connection error');
     return { error: e.message };
   }
 }
 
 export function connectSSE(handlers) {
-  const source = new EventSource('/api/events');
-  for (const [event, handler] of Object.entries(handlers)) {
-    source.addEventListener(event, e => handler(JSON.parse(e.data)));
+  let source;
+  let retryDelay = 1000;
+
+  function connect() {
+    source = new EventSource('/api/events');
+    for (const [event, handler] of Object.entries(handlers)) {
+      source.addEventListener(event, e => handler(JSON.parse(e.data)));
+    }
+    source.onopen = () => { retryDelay = 1000; };
+    source.onerror = () => {
+      source.close();
+      setTimeout(connect, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 30000);
+    };
   }
+
+  connect();
   return source;
 }

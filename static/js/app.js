@@ -11,6 +11,8 @@ const playerState = document.getElementById('player-state');
 const miniPlayer = document.getElementById('mini-player');
 const controlsEl = document.querySelector('.controls');
 
+let openItemVersion = 0;
+
 // --- Init ---
 initSidebar({
   onOpen: openItem,
@@ -41,7 +43,8 @@ initModal({
 
 connectSSE({
   generation_progress: (data) => {
-    const pct = Math.round((data.done / data.total) * 100);
+    const total = data.total || 1;
+    const pct = Math.round((data.done / total) * 100);
     updateGenerationProgress(data.item_id, pct);
   },
   generation_complete: (data) => {
@@ -74,9 +77,10 @@ async function openItem(itemId) {
   saveProgress();
   stop();
   state.currentItemId = itemId;
+  const version = ++openItemVersion;
 
   const data = await api(`/api/library/${itemId}`);
-  if (data.error) return;
+  if (data.error || version !== openItemVersion) return;
 
   state.currentItem = data.item;
   state.timeline = data.item.timeline || [];

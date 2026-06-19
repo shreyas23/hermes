@@ -27,13 +27,13 @@
         <input type="text" class="sidebar__search-input" id="search-input" placeholder="Search library...">
       </div>
 
-      <nav class="nav">
-        <div class="nav__item is-active" data-view="recent">Recent</div>
-        <div class="nav__item" data-view="in_progress">In Progress</div>
+      <nav class="nav" role="navigation" aria-label="Library">
+        <button class="nav__item is-active" data-view="recent">Recent</button>
+        <button class="nav__item" data-view="in_progress">In Progress</button>
         <div class="nav__section">Sources</div>
-        <div class="nav__item" data-view="articles">Articles</div>
-        <div class="nav__item" data-view="documents">Documents</div>
-        <div class="nav__item" data-view="texts">Text</div>
+        <button class="nav__item" data-view="articles">Articles</button>
+        <button class="nav__item" data-view="documents">Documents</button>
+        <button class="nav__item" data-view="texts">Text</button>
         <div class="nav__section">
           Collections
           <button class="nav__section-btn" id="btn-new-collection" title="New collection">+</button>
@@ -70,6 +70,8 @@
 
       <div class="player-state" id="player-state">
         <div class="reader" id="reader-view">
+          <button class="reader__toc-btn is-hidden" id="btn-toc" title="Table of Contents">&#x2630;</button>
+          <div class="reader__toc is-hidden" id="reader-toc"></div>
           <div class="reader__scroll" id="reader-content"></div>
           <button class="reader__follow" id="btn-follow">&#x2193; Now playing</button>
         </div>
@@ -115,7 +117,7 @@
 
   <div class="modal-backdrop" id="import-modal">
     <div class="modal-backdrop__click-target" id="import-backdrop"></div>
-    <div class="modal">
+    <div class="modal" role="dialog" aria-label="Import">
       <h2 class="modal__title">Import</h2>
       <div class="modal__tabs">
         <button class="modal__tab is-active" data-tab="url">URL</button>
@@ -152,11 +154,11 @@
 
   <div class="modal-backdrop" id="settings-modal">
     <div id="settings-backdrop" style="position:absolute;inset:0"></div>
-    <div class="modal" style="position:relative;z-index:1">
+    <div class="modal" role="dialog" aria-label="Settings" style="position:relative;z-index:1">
       <h2 class="modal__title">Settings</h2>
 
       <div class="settings-group">
-        <label class="settings-label">TTS Engine</label>
+        <label class="settings-label" for="setting-engine">TTS Engine</label>
         <select class="settings-select" id="setting-engine">
           <option value="edge">Edge TTS (online, faster)</option>
           <option value="say">macOS Say (offline)</option>
@@ -164,12 +166,12 @@
       </div>
 
       <div class="settings-group" id="edge-voice-group">
-        <label class="settings-label">Edge Voice</label>
+        <label class="settings-label" for="setting-edge-voice">Edge Voice</label>
         <select class="settings-select" id="setting-edge-voice"></select>
       </div>
 
       <div class="settings-group is-hidden" id="say-voice-group">
-        <label class="settings-label">macOS Voice</label>
+        <label class="settings-label" for="setting-say-voice">macOS Voice</label>
         <select class="settings-select" id="setting-say-voice"></select>
       </div>
 

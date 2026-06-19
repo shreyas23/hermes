@@ -122,27 +122,27 @@ function renderItemList(items) {
     `;
 
     el.addEventListener('click', () => onItemOpen?.(item.id));
-    el.addEventListener('contextmenu', (e) => {
+    el.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const actions = [
         { label: 'Play', onClick: () => onItemOpen?.(item.id) },
         { separator: true },
       ];
-      // Add "Add to collection" with submenu-like entries
-      api('/api/collections', { showError: false }).then(data => {
-        if (data.collections?.length) {
-          data.collections.forEach(c => {
-            actions.splice(-0, 0, {
-              label: `Add to ${c.name}`,
-              onClick: async () => {
-                await api(`/api/collections/${c.id}/items`, { body: { item_id: item.id } });
-                toastSuccess(`Added to ${c.name}`);
-                loadCollections();
-              },
-            });
+      const data = await api('/api/collections', { showError: false });
+      if (data.collections?.length) {
+        data.collections.forEach(c => {
+          actions.push({
+            label: `Add to ${c.name}`,
+            onClick: async () => {
+              await api(`/api/collections/${c.id}/items`, { body: { item_id: item.id } });
+              toastSuccess(`Added to ${c.name}`);
+              loadCollections();
+            },
           });
-        }
-      });
+        });
+        actions.push({ separator: true });
+      }
       actions.push({
         label: 'Delete',
         destructive: true,
