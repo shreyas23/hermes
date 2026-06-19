@@ -96,12 +96,19 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
             a['href'] = urljoin(base_url, href)
 
     # Re-inject content images that readability dropped
-    reader_img_srcs = {img.get('src', '') for img in soup.find_all('img')}
+    def _img_key(url):
+        """Extract base image path, ignoring CDN resize params."""
+        import re
+        m = re.search(r'([\w-]{20,}\.\w{3,4})$', url.split('?')[0].split('%2F')[-1])
+        return m.group(1) if m else url
+
+    reader_img_keys = {_img_key(img.get('src', '')) for img in soup.find_all('img')}
     article = orig_soup.find('article') or orig_soup.find('main') or orig_soup
     for img in article.find_all('img'):
         src = img.get('src', '')
         abs_src = urljoin(base_url, src) if src else ''
-        if not abs_src or abs_src in reader_img_srcs:
+        key = _img_key(abs_src)
+        if not abs_src or key in reader_img_keys:
             continue
         w = str(img.get('width', '999')).split('.')[0]
         h = str(img.get('height', '999')).split('.')[0]
@@ -139,11 +146,11 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
         if not inserted:
             paras = soup.find_all('p')
             if paras:
-                ratio = len(reader_img_srcs) / max(len(paras), 1)
+                ratio = len(reader_img_keys) / max(len(paras), 1)
                 insert_at = min(int(ratio * len(paras)), len(paras) - 1)
                 paras[insert_at].insert_after(new_img)
 
-        reader_img_srcs.add(abs_src)
+        reader_img_keys.add(key)
 
     return str(soup)
 
