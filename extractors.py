@@ -37,7 +37,7 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
     from readability import Document
     from bs4 import BeautifulSoup
 
-    # Capture original image dimensions before readability strips them
+    # Pre-process: unwrap <picture> to expose <img>, capture dimensions
     orig_soup = BeautifulSoup(html, 'html.parser')
     img_dims = {}
     for img in orig_soup.find_all('img'):
@@ -48,12 +48,20 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
                 dims['height'] = str(img['height'])
             if img.get('width') and img['width']:
                 dims['width'] = str(img['width'])
-            if img.get('style') and img['style']:
-                dims['style'] = img['style']
             if dims:
                 img_dims[src] = dims
 
-    doc = Document(html)
+    for picture in orig_soup.find_all('picture'):
+        img = picture.find('img')
+        if img:
+            picture.replace_with(img)
+        else:
+            source = picture.find('source')
+            if source and source.get('srcset'):
+                new_img = orig_soup.new_tag('img', src=source['srcset'].split()[0])
+                picture.replace_with(new_img)
+
+    doc = Document(str(orig_soup))
     reader_html = doc.summary()
 
     soup = BeautifulSoup(reader_html, 'html.parser')
@@ -73,6 +81,56 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
         href = a.get('href', '')
         if href:
             a['href'] = urljoin(base_url, href)
+
+    # Re-inject content images that readability dropped
+    reader_img_srcs = {img.get('src', '') for img in soup.find_all('img')}
+    article = orig_soup.find('article') or orig_soup.find('main') or orig_soup
+    for img in article.find_all('img'):
+        src = img.get('src', '')
+        abs_src = urljoin(base_url, src) if src else ''
+        if not abs_src or abs_src in reader_img_srcs:
+            continue
+        w = str(img.get('width', '999')).split('.')[0]
+        h = str(img.get('height', '999')).split('.')[0]
+        if (w.isdigit() and int(w) < 100) or (h.isdigit() and int(h) < 50):
+            continue
+
+        alt = img.get('alt', '')
+        prev_text = ''
+        for sib in img.previous_siblings:
+            t = getattr(sib, 'get_text', lambda: str(sib))()
+            if t.strip():
+                prev_text = t.strip()
+                break
+
+        new_img = soup.new_tag('img', src=abs_src)
+        if alt:
+            new_img['alt'] = alt
+        if w.isdigit() and int(w) > 0:
+            new_img['width'] = w
+        if h.isdigit() and int(h) > 0:
+            new_img['height'] = h
+
+        inserted = False
+        if prev_text:
+            words = prev_text[-40:].split()
+            search = ' '.join(words[-4:]) if len(words) >= 4 else prev_text[-20:]
+            for tn in soup.find_all(string=True):
+                if search in str(tn):
+                    parent = tn.find_parent()
+                    if parent:
+                        parent.insert_after(new_img)
+                        inserted = True
+                        break
+
+        if not inserted:
+            paras = soup.find_all('p')
+            if paras:
+                ratio = len(reader_img_srcs) / max(len(paras), 1)
+                insert_at = min(int(ratio * len(paras)), len(paras) - 1)
+                paras[insert_at].insert_after(new_img)
+
+        reader_img_srcs.add(abs_src)
 
     return str(soup)
 
