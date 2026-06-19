@@ -55,10 +55,11 @@ def init_db():
                 PRIMARY KEY (collection_id, item_id)
             );
         ''')
-        try:
-            db.execute('ALTER TABLE items ADD COLUMN images TEXT')
-        except sqlite3.OperationalError:
-            pass
+        for col in ['images TEXT', 'reader_html TEXT']:
+            try:
+                db.execute(f'ALTER TABLE items ADD COLUMN {col}')
+            except sqlite3.OperationalError:
+                pass
 
 
 @contextmanager
@@ -78,15 +79,15 @@ def get_db():
         raise
 
 
-def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None):
+def add_item(title, source_type, text_content, sentences, source_url=None, original_path=None, images=None, reader_html=None):
     now = time.time()
     with get_db() as db:
         cur = db.execute(
             '''INSERT INTO items (title, source_type, source_url, original_path,
-               text_content, sentences, images, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+               text_content, sentences, images, reader_html, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (title, source_type, source_url, original_path,
-             text_content, json.dumps(sentences), json.dumps(images or []), now, now)
+             text_content, json.dumps(sentences), json.dumps(images or []), reader_html, now, now)
         )
         item_id = cur.lastrowid
         db.execute('INSERT INTO progress (item_id) VALUES (?)', (item_id,))

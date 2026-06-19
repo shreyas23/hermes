@@ -60,7 +60,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Hermes.app',
-    icon=None,
+    icon='assets/icon.icns',
     bundle_identifier='com.hermes.app',
     info_plist={
         'CFBundleName': 'Hermes',

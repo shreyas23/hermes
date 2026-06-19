@@ -9,7 +9,7 @@ from flask import Flask, Response, render_template, request, jsonify, send_file
 from pysbd import Segmenter
 
 from audio import generate_audio_background, cancel_generation, is_generating
-from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences
+from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences, clean_html_for_reader
 from models import (
     init_db, add_item, get_item, get_items, get_recent, get_in_progress,
     search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
@@ -223,13 +223,8 @@ def import_url():
     if not text_only or not text_only.strip():
         return jsonify({'error': 'Could not extract article text'}), 400
 
-    item_id_placeholder = int(time.time() * 1000) % 1000000
-    img_dir = item_images_dir(item_id_placeholder)
-    os.makedirs(img_dir, exist_ok=True)
-
-    img_result = extract_url_with_images(downloaded, url, img_dir)
+    reader_html = clean_html_for_reader(downloaded, url)
     sentences = _split(text_only)
-    images = map_images_to_sentences(img_result.get('images', []) if img_result else [], text_only, sentences)
 
     item_id = add_item(
         title=title,
@@ -237,20 +232,8 @@ def import_url():
         text_content=text_only,
         sentences=sentences,
         source_url=url,
-        images=images,
+        reader_html=reader_html,
     )
-
-    real_img_dir = item_images_dir(item_id)
-    if img_dir != real_img_dir:
-        if os.path.isdir(img_dir) and os.listdir(img_dir):
-            os.makedirs(real_img_dir, exist_ok=True)
-            for f in os.listdir(img_dir):
-                os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
-        if os.path.isdir(img_dir):
-            try:
-                os.rmdir(img_dir)
-            except OSError:
-                pass
 
     _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})

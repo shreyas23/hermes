@@ -10,6 +10,7 @@ dependencies = [
     "pysbd>=0.3.4",
     "python-docx>=1.2.0",
     "pywebview>=6.2.1",
+    "readability-lxml>=0.8.4.1",
     "striprtf>=0.0.32",
     "trafilatura>=2.1.0",
 ]
