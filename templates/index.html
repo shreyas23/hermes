@@ -13,7 +13,10 @@
     <aside class="sidebar">
       <div class="sidebar__header">
         <h1 class="sidebar__title">Hermes</h1>
-        <button class="sidebar__add" id="btn-add" title="Import">+</button>
+        <div class="sidebar__actions">
+          <button class="sidebar__icon-btn" id="btn-settings" title="Settings">&#x2699;</button>
+          <button class="sidebar__add" id="btn-add" title="Import">+</button>
+        </div>
       </div>
 
       <div class="sidebar__search">
@@ -133,6 +136,34 @@
       </div>
 
       <button class="modal__cancel" id="import-close">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="settings-modal">
+    <div id="settings-backdrop" style="position:absolute;inset:0"></div>
+    <div class="modal" style="position:relative;z-index:1">
+      <h2 class="modal__title">Settings</h2>
+
+      <div class="settings-group">
+        <label class="settings-label">TTS Engine</label>
+        <select class="settings-select" id="setting-engine">
+          <option value="edge">Edge TTS (online, faster)</option>
+          <option value="say">macOS Say (offline)</option>
+        </select>
+      </div>
+
+      <div class="settings-group" id="edge-voice-group">
+        <label class="settings-label">Edge Voice</label>
+        <select class="settings-select" id="setting-edge-voice"></select>
+      </div>
+
+      <div class="settings-group is-hidden" id="say-voice-group">
+        <label class="settings-label">macOS Voice</label>
+        <select class="settings-select" id="setting-say-voice"></select>
+      </div>
+
+      <button class="modal__submit" id="settings-save">Save</button>
+      <button class="modal__cancel" id="settings-close">Cancel</button>
     </div>
   </div>
 

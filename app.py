@@ -15,6 +15,7 @@ from models import (
     search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
     item_images_dir, create_collection, get_collections, add_to_collection,
     remove_from_collection, delete_collection,
+    get_all_settings, get_setting, set_setting,
 )
 
 app = Flask(__name__)
@@ -313,6 +314,45 @@ def collection_remove(cid, item_id):
     return jsonify({'removed': True})
 
 
+# --- Settings ---
+
+@app.route('/api/settings', methods=['GET'])
+def settings_get():
+    return jsonify(get_all_settings())
+
+
+@app.route('/api/settings', methods=['POST'])
+def settings_update():
+    data = request.json
+    for key, value in data.items():
+        set_setting(key, value)
+    return jsonify(get_all_settings())
+
+
+@app.route('/api/voices', methods=['GET'])
+def voices_list():
+    engine = request.args.get('engine', 'edge')
+    if engine == 'edge':
+        import asyncio
+        import edge_tts
+        async def fetch():
+            return await edge_tts.list_voices()
+        all_voices = asyncio.run(fetch())
+        voices = [{'id': v['ShortName'], 'name': v['ShortName'], 'gender': v['Gender'], 'locale': v['Locale']}
+                  for v in all_voices if v['Locale'].startswith('en-')]
+        return jsonify({'voices': voices})
+    else:
+        import subprocess
+        out = subprocess.run(['say', '-v', '?'], capture_output=True, text=True)
+        voices = []
+        for line in out.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and 'en_' in line:
+                name = parts[0]
+                voices.append({'id': name, 'name': name, 'locale': parts[1] if len(parts) > 1 else ''})
+        return jsonify({'voices': voices})
+
+
 # --- SSE ---
 
 @app.route('/api/events')
@@ -359,7 +399,9 @@ def _start_generation(item_id, sentences):
     def on_cancel(iid):
         broadcast_sse('generation_cancelled', {'item_id': iid})
 
-    generate_audio_background(item_id, sentences, on_progress, on_complete, on_cancel)
+    engine = get_setting('tts_engine')
+    voice = get_setting('edge_voice') if engine == 'edge' else get_setting('say_voice')
+    generate_audio_background(item_id, sentences, on_progress, on_complete, on_cancel, engine=engine, voice=voice)
 
 
 def _item_summary(item):

@@ -4,6 +4,7 @@ import { initSidebar, loadView, loadCollections, updateGenerationProgress } from
 import { initReaderHighlight, renderContent } from './reader-highlight.js';
 import { initPlayer, loadAudio, stop, saveProgress } from './player.js';
 import { initModal } from './modal.js';
+import { initSettings } from './settings.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -27,6 +28,7 @@ initSidebar({
 
 initReaderHighlight();
 initPlayer();
+initSettings();
 
 initModal({
   onImport: (itemId, autoOpen = true) => {

@@ -913,6 +913,39 @@
   to { opacity: 0; }
 }
 
+/* Settings */
+.settings-group {
+  margin-bottom: var(--space-4);
+}
+
+.settings-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.settings-select {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-family);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.settings-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
 /* Utility: hidden */
 .is-hidden {
   display: none !important;
