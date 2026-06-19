@@ -6,13 +6,28 @@ import { formatTime, escHtml } from './utils.js';
 
 const itemList = document.getElementById('item-list');
 const collectionsList = document.getElementById('collections-list');
+const searchInput = document.getElementById('search-input');
 
 let onItemOpen = null;
 let onItemDelete = null;
+let searchTimeout = null;
 
 export function initSidebar({ onOpen, onDelete }) {
   onItemOpen = onOpen;
   onItemDelete = onDelete;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const query = searchInput.value.trim();
+    if (!query) {
+      loadView(state.currentView);
+      return;
+    }
+    searchTimeout = setTimeout(async () => {
+      const data = await api(`/api/library/search?q=${encodeURIComponent(query)}`, { showError: false });
+      if (data.items) renderItemList(data.items);
+    }, 250);
+  });
 
   document.querySelectorAll('.nav__item').forEach(el => {
     el.addEventListener('click', () => {

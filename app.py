@@ -64,6 +64,16 @@ def library_list():
     return jsonify({'items': [_item_summary(i) for i in items]})
 
 
+@app.route('/api/library/search', methods=['GET'])
+def library_search():
+    query = request.args.get('q', '').strip().lower()
+    if not query:
+        return jsonify({'items': []})
+    items = get_items()
+    results = [i for i in items if query in i['title'].lower()]
+    return jsonify({'items': [_item_summary(i) for i in results]})
+
+
 @app.route('/api/library/<int:item_id>', methods=['GET'])
 def library_item(item_id):
     item = get_item(item_id)
