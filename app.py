@@ -1,6 +1,7 @@
 import json
 import os
 import queue
+import re
 import threading
 import time
 from pathlib import Path
@@ -189,21 +190,69 @@ def import_file():
 
 @app.route('/api/import/url', methods=['POST'])
 def import_url():
-    import trafilatura
-
     url = request.json.get('url', '').strip()
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
     import urllib.request
+    import tempfile
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'})
         with urllib.request.urlopen(req, timeout=30) as resp:
-            downloaded = resp.read().decode('utf-8', errors='ignore')
+            content_type = resp.headers.get('Content-Type', '').lower()
+            raw_bytes = resp.read()
     except Exception as e:
         return jsonify({'error': f'Could not download page: {e}'}), 400
-    if not downloaded:
+    if not raw_bytes:
         return jsonify({'error': 'Could not download page'}), 400
+
+    is_pdf = 'application/pdf' in content_type or url.lower().split('?')[0].endswith('.pdf')
+
+    if is_pdf:
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            tmp.write(raw_bytes)
+            tmp_path = tmp.name
+        try:
+            item_id_placeholder = int(time.time() * 1000) % 1000000
+            img_dir = item_images_dir(item_id_placeholder)
+            os.makedirs(img_dir, exist_ok=True)
+
+            result = extract_with_images(tmp_path, img_dir)
+            if not result or not result['text'].strip():
+                return jsonify({'error': 'Could not extract text from PDF'}), 400
+
+            text = result['text']
+            title = Path(url.split('?')[0].split('/')[-1]).stem or url
+            sentences = _split(text)
+            images = map_images_to_sentences(result.get('images', []), text, sentences)
+
+            item_id = add_item(
+                title=title,
+                source_type='document',
+                text_content=text,
+                sentences=sentences,
+                source_url=url,
+                images=images,
+            )
+
+            real_img_dir = item_images_dir(item_id)
+            if img_dir != real_img_dir:
+                if os.path.isdir(img_dir) and os.listdir(img_dir):
+                    os.makedirs(real_img_dir, exist_ok=True)
+                    for f in os.listdir(img_dir):
+                        os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+                if os.path.isdir(img_dir):
+                    try:
+                        os.rmdir(img_dir)
+                    except OSError:
+                        pass
+
+            _start_generation(item_id, sentences)
+            return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
+        finally:
+            os.unlink(tmp_path)
+
+    downloaded = raw_bytes.decode('utf-8', errors='ignore')
 
     reader_html, title = clean_html_for_reader(downloaded, url)
     title = title or url
@@ -211,7 +260,7 @@ def import_url():
         return jsonify({'error': 'Could not extract article text'}), 400
 
     from bs4 import BeautifulSoup
-    text_only = BeautifulSoup(reader_html, 'html.parser').get_text(separator='\n', strip=True)
+    text_only = _html_to_text(BeautifulSoup(reader_html, 'html.parser'))
     if not text_only.strip():
         return jsonify({'error': 'Could not extract article text'}), 400
 
@@ -367,6 +416,31 @@ def events():
 
 # --- Helpers ---
 
+_BLOCK_TAGS = frozenset([
+    'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote',
+    'pre', 'table', 'tr', 'td', 'th', 'section', 'article', 'figure',
+    'figcaption', 'details', 'summary', 'dt', 'dd',
+])
+
+
+def _html_to_text(soup):
+    from bs4 import NavigableString, Tag
+    parts = []
+    for el in soup.descendants:
+        if isinstance(el, NavigableString):
+            text = str(el).strip()
+            if text:
+                if parts and not parts[-1].endswith('\n'):
+                    parts.append(' ')
+                parts.append(text)
+        elif isinstance(el, Tag):
+            if el.name == 'br':
+                parts.append('\n')
+            elif el.name in _BLOCK_TAGS and parts and not parts[-1].endswith('\n'):
+                parts.append('\n')
+    return re.sub(r'\n{2,}', '\n', ''.join(parts)).strip()
+
+
 def _split(text):
     sentences = segmenter.segment(text)
     return [s.strip() for s in sentences if s.strip()]
@@ -462,6 +536,7 @@ if __name__ == '__main__':
                 b'applicationShouldHandleReopen:hasVisibleWindows:',
                 _reopen,
             )
+
         except ImportError:
             pass
 

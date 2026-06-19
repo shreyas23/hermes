@@ -6,9 +6,16 @@ from urllib.parse import urljoin
 
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt', '.rtf', '.html', '.htm'}
 
+_BLOCK_TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'div', 'td', 'th']
+
 
 def inject_sentence_spans(html, sentences):
-    """Wrap each sentence's text in <span data-si="N"> inside reader HTML."""
+    """Wrap each sentence's text in <span data-si="N"> inside reader HTML.
+
+    Uses two passes: first wraps multi-node sentences (those spanning inline
+    elements) at the block-child level, then rebuilds the word index and wraps
+    single-node sentences via text-node splitting.
+    """
     from bs4 import BeautifulSoup, NavigableString
     from collections import defaultdict
 
@@ -17,58 +24,85 @@ def inject_sentence_spans(html, sentences):
     def norm(w):
         return re.sub(r"[^\w']", '', w.lower())
 
-    # Build word stream from all text nodes
-    words = []
-    for text_node in soup.find_all(string=True):
-        for m in re.finditer(r'\S+', str(text_node)):
-            n = norm(m.group())
-            if n:
-                words.append((n, text_node, m.start(), m.end()))
+    def build_words():
+        words = []
+        for tn in soup.find_all(string=True):
+            for m in re.finditer(r'\S+', str(tn)):
+                n = norm(m.group())
+                if n:
+                    words.append((n, tn, m.start(), m.end()))
+        return words
 
-    # Match each sentence to word positions
-    matches = []
-    wi = 0
-    for si, sent in enumerate(sentences):
-        sw = [norm(w) for w in sent.split() if norm(w)]
-        if not sw:
-            continue
+    def match_all(words):
+        matches = []
+        wi = 0
+        for si, sent in enumerate(sentences):
+            sw = [norm(w) for w in sent.split() if norm(w)]
+            if not sw:
+                continue
+            plen = min(4, len(sw))
+            found = -1
+            for i in range(wi, len(words) - plen + 1):
+                if all(words[i + j][0] == sw[j] for j in range(plen)):
+                    found = i
+                    break
+            if found == -1:
+                continue
+            end = found
+            for j in range(len(sw)):
+                if found + j >= len(words):
+                    break
+                if words[found + j][0] == sw[j]:
+                    end = found + j
+                else:
+                    break
+            matches.append((si, found, end))
+            wi = end + 1
+        return matches
 
-        plen = min(4, len(sw))
-        found = -1
-        for i in range(wi, len(words) - plen + 1):
-            if all(words[i + j][0] == sw[j] for j in range(plen)):
-                found = i
-                break
+    # --- Pass 1: wrap multi-node sentences at block-child level ---
+    words = build_words()
+    matches = match_all(words)
+    handled = set()
 
-        if found == -1:
-            continue
-
-        end = found
-        for j in range(len(sw)):
-            if found + j >= len(words):
-                break
-            if words[found + j][0] == sw[j]:
-                end = found + j
-            else:
-                break
-
-        matches.append((si, found, end))
-        wi = end + 1
-
-    # Separate single-node vs multi-node matches
-    single = defaultdict(list)  # text_node id -> [(si, start_off, end_off, text_node)]
-    multi = []
-
+    # Group multi-node matches by block parent
+    multi_by_block = defaultdict(list)
     for si, sw_idx, ew_idx in matches:
-        start_node, start_off = words[sw_idx][1], words[sw_idx][2]
-        end_node, end_off = words[ew_idx][1], words[ew_idx][3]
+        start_node, end_node = words[sw_idx][1], words[ew_idx][1]
+        if start_node is not end_node:
+            block = start_node.find_parent(_BLOCK_TAGS)
+            if block:
+                sc = _ancestor_child_of(block, start_node)
+                ec = _ancestor_child_of(block, end_node)
+                if sc and ec:
+                    multi_by_block[id(block)].append(
+                        (si, block, sc, words[sw_idx][2], ec, words[ew_idx][3]))
 
-        if start_node is end_node:
-            single[id(start_node)].append((si, start_off, end_off, start_node))
+    for block_id, group in multi_by_block.items():
+        if len(group) == 1:
+            # One multi-node sentence in this block — EPUB-style wrap
+            si, block, sc, s_off, ec, e_off = group[0]
+            if _wrap_sentence_range(soup, si, block, sc, s_off, ec, e_off):
+                handled.add(si)
         else:
-            multi.append((si, start_node))
+            # Multiple multi-node sentences share a block — tag block for each
+            for si, block, sc, s_off, ec, e_off in group:
+                if 'data-si' not in block.attrs:
+                    block['data-si'] = str(si)
+                handled.add(si)
 
-    # Inject spans for single-node sentences (grouped by text node)
+    # --- Pass 2: rebuild word index, wrap single-node sentences ---
+    words = build_words()
+    matches = match_all(words)
+
+    single = defaultdict(list)
+    for si, sw_idx, ew_idx in matches:
+        if si in handled:
+            continue
+        start_node, end_node = words[sw_idx][1], words[ew_idx][1]
+        if start_node is end_node:
+            single[id(start_node)].append((si, words[sw_idx][2], words[ew_idx][3], start_node))
+
     for entries in single.values():
         entries.sort(key=lambda x: x[1])
         text_node = entries[0][3]
@@ -95,13 +129,60 @@ def inject_sentence_spans(html, sentences):
                 prev.insert_after(part)
                 prev = part
 
-    # Multi-node sentences: tag nearest block parent
-    for si, start_node in multi:
-        block = start_node.find_parent(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'])
-        if block:
-            block['data-si'] = str(si)
-
     return str(soup)
+
+
+def _ancestor_child_of(block, node):
+    """Walk up from node to find the direct child of block that contains it."""
+    current = node
+    while current and current.parent is not block:
+        current = current.parent
+    return current
+
+
+def _wrap_sentence_range(soup, si, block, sc, s_off, ec, e_off):
+    """Wrap a sentence range in a <span data-si> within a block element.
+    Returns True on success."""
+    from bs4 import NavigableString
+    try:
+        actual_start = sc
+        if isinstance(sc, NavigableString) and s_off > 0:
+            text = str(sc)
+            before = NavigableString(text[:s_off])
+            after = NavigableString(text[s_off:])
+            sc.replace_with(before)
+            before.insert_after(after)
+            actual_start = after
+
+        actual_end = ec
+        if isinstance(ec, NavigableString) and e_off < len(str(ec)):
+            text = str(ec)
+            sent_part = NavigableString(text[:e_off])
+            rest_part = NavigableString(text[e_off:])
+            ec.replace_with(sent_part)
+            sent_part.insert_after(rest_part)
+            actual_end = sent_part
+
+        to_wrap = []
+        current = actual_start
+        while current:
+            to_wrap.append(current)
+            if current is actual_end:
+                break
+            current = current.next_sibling
+        else:
+            return False
+
+        if to_wrap:
+            span = soup.new_tag('span')
+            span['data-si'] = str(si)
+            to_wrap[0].insert_before(span)
+            for node in to_wrap:
+                span.append(node.extract())
+            return True
+    except Exception:
+        return False
+    return False
 
 
 def extract_text(file_path: str) -> str | None:
