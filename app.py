@@ -432,18 +432,24 @@ if __name__ == '__main__':
         return False
 
     def _setup_dock_reopen():
+        import time
+        time.sleep(1)
         try:
             from AppKit import NSApplication
-            from Foundation import NSObject
-
-            class DockDelegate(NSObject):
-                def applicationShouldHandleReopen_hasVisibleWindows_(self, app, flag):
-                    window.show()
-                    return True
+            import objc
 
             ns_app = NSApplication.sharedApplication()
-            delegate = DockDelegate.alloc().init()
-            ns_app.setDelegate_(delegate)
+            delegate = ns_app.delegate()
+
+            def _reopen(self, app, flag):
+                window.show()
+                return True
+
+            objc.classAddMethod(
+                delegate.__class__,
+                b'applicationShouldHandleReopen:hasVisibleWindows:',
+                _reopen,
+            )
         except ImportError:
             pass
 
