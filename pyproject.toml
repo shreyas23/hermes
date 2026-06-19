@@ -13,3 +13,8 @@ dependencies = [
     "striprtf>=0.0.32",
     "trafilatura>=2.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.21.0",
+]

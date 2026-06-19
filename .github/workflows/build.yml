@@ -1,0 +1,40 @@
+name: Build macOS DMG
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build app bundle
+        run: uv run pyinstaller hermes.spec --noconfirm
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Hermes" \
+            --window-size 600 400 \
+            --icon "Hermes.app" 150 200 \
+            --app-drop-link 450 200 \
+            dist/Hermes.dmg \
+            dist/Hermes.app
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes.dmg
+          path: dist/Hermes.dmg
