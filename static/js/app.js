@@ -110,38 +110,17 @@ function setMode(mode) {
 
 function renderReader(item) {
   readerContent.innerHTML = '';
-  const images = item.images || [];
-  const imagesByPosition = {};
-  images.forEach(img => {
-    const pos = img.after_sentence;
-    if (!imagesByPosition[pos]) imagesByPosition[pos] = [];
-    imagesByPosition[pos].push(img);
-  });
 
-  item.sentences.forEach((text, i) => {
+  if (item.reader_html) {
+    readerContent.innerHTML = item.reader_html;
+    return;
+  }
+
+  item.sentences.forEach((text) => {
     const p = document.createElement('p');
     p.className = 'reader__paragraph';
     p.textContent = text;
     readerContent.appendChild(p);
-
-    if (imagesByPosition[i]) {
-      imagesByPosition[i].forEach(img => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'reader__image';
-        const imgEl = document.createElement('img');
-        imgEl.src = `/api/library/${item.id}/images/${img.filename}`;
-        imgEl.alt = img.alt || '';
-        imgEl.loading = 'lazy';
-        wrapper.appendChild(imgEl);
-        if (img.alt) {
-          const caption = document.createElement('div');
-          caption.className = 'reader__image-caption';
-          caption.textContent = img.alt;
-          wrapper.appendChild(caption);
-        }
-        readerContent.appendChild(wrapper);
-      });
-    }
   });
 }
 
