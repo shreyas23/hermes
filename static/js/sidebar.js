@@ -1,5 +1,7 @@
 import { api } from './api.js';
 import { state } from './state.js';
+import { showContextMenu } from './contextmenu.js';
+import { toastSuccess } from './toast.js';
 import { formatTime, escHtml } from './utils.js';
 
 const itemList = document.getElementById('item-list');
@@ -91,6 +93,40 @@ function renderItemList(items) {
     `;
 
     el.addEventListener('click', () => onItemOpen?.(item.id));
+    el.addEventListener('contextmenu', (e) => {
+      e.stopPropagation();
+      const actions = [
+        { label: 'Play', onClick: () => onItemOpen?.(item.id) },
+        { separator: true },
+      ];
+      // Add "Add to collection" with submenu-like entries
+      api('/api/collections', { showError: false }).then(data => {
+        if (data.collections?.length) {
+          data.collections.forEach(c => {
+            actions.splice(-0, 0, {
+              label: `Add to ${c.name}`,
+              onClick: async () => {
+                await api(`/api/collections/${c.id}/items`, { body: { item_id: item.id } });
+                toastSuccess(`Added to ${c.name}`);
+                loadCollections();
+              },
+            });
+          });
+        }
+      });
+      actions.push({
+        label: 'Delete',
+        destructive: true,
+        onClick: async () => {
+          if (!confirm(`Delete "${item.title}"?`)) return;
+          await api(`/api/library/${item.id}`, { method: 'DELETE' });
+          onItemDelete?.(item.id);
+          loadView(state.currentView);
+          loadCollections();
+        },
+      });
+      showContextMenu(e, actions);
+    });
     el.querySelector('.item__delete').addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm(`Delete "${item.title}"?`)) return;
