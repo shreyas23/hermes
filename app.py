@@ -521,12 +521,6 @@ if __name__ == '__main__':
                 icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
                 ns_app.setApplicationIconImage_(icon)
 
-            from Foundation import NSBundle
-            bundle = NSBundle.mainBundle()
-            info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
-            if info:
-                info['CFBundleName'] = 'Hermes'
-
             def _reopen(self, app, flag):
                 window.show()
                 return True
