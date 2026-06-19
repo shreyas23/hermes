@@ -71,10 +71,19 @@ async function loadCollection(id) {
   if (data.items) renderItemList(data.items);
 }
 
+const emptyMessages = {
+  recent: 'No items yet — click + to import',
+  in_progress: 'Nothing in progress',
+  articles: 'No articles — import a URL to get started',
+  documents: 'No documents — import a file to get started',
+  texts: 'No text items yet',
+};
+
 function renderItemList(items) {
   itemList.innerHTML = '';
   if (items.length === 0) {
-    itemList.innerHTML = '<div class="item-list__empty">No items yet</div>';
+    const msg = emptyMessages[state.currentView] || 'No items yet';
+    itemList.innerHTML = `<div class="item-list__empty">${msg}</div>`;
     return;
   }
   items.forEach(item => {
