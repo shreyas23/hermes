@@ -9,7 +9,7 @@ from flask import Flask, Response, render_template, request, jsonify, send_file
 from pysbd import Segmenter
 
 from audio import generate_audio_background, cancel_generation, is_generating
-from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences, clean_html_for_reader
+from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences, clean_html_for_reader, inject_sentence_spans
 from models import (
     init_db, add_item, get_item, get_items, get_recent, get_in_progress,
     search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
@@ -216,6 +216,7 @@ def import_url():
         return jsonify({'error': 'Could not extract article text'}), 400
 
     sentences = _split(text_only)
+    reader_html = inject_sentence_spans(reader_html, sentences)
 
     item_id = add_item(
         title=title,
@@ -435,11 +436,22 @@ if __name__ == '__main__':
         import time
         time.sleep(1)
         try:
-            from AppKit import NSApplication
+            from AppKit import NSApplication, NSImage
             import objc
 
             ns_app = NSApplication.sharedApplication()
             delegate = ns_app.delegate()
+
+            icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon.icns')
+            if os.path.isfile(icon_path):
+                icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
+                ns_app.setApplicationIconImage_(icon)
+
+            from Foundation import NSBundle
+            bundle = NSBundle.mainBundle()
+            info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+            if info:
+                info['CFBundleName'] = 'Hermes'
 
             def _reopen(self, app, flag):
                 window.show()
