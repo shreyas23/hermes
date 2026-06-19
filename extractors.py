@@ -33,11 +33,11 @@ def extract_with_images(file_path: str, image_dir: str = None) -> dict | None:
         return None
 
 
-def clean_html_for_reader(html: str, base_url: str) -> str:
+def clean_html_for_reader(html: str, base_url: str) -> tuple[str, str]:
     from readability import Document
     from bs4 import BeautifulSoup
 
-    # Capture original image dimensions before readability strips them
+    # Pre-process: unwrap <picture> to expose <img>, capture dimensions
     orig_soup = BeautifulSoup(html, 'html.parser')
     img_dims = {}
     for img in orig_soup.find_all('img'):
@@ -48,15 +48,35 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
                 dims['height'] = str(img['height'])
             if img.get('width') and img['width']:
                 dims['width'] = str(img['width'])
-            if img.get('style') and img['style']:
-                dims['style'] = img['style']
             if dims:
                 img_dims[src] = dims
 
-    doc = Document(html)
+    for picture in orig_soup.find_all('picture'):
+        img = picture.find('img')
+        if img:
+            picture.replace_with(img)
+        else:
+            source = picture.find('source')
+            if source and source.get('srcset'):
+                new_img = orig_soup.new_tag('img', src=source['srcset'].split()[0])
+                picture.replace_with(new_img)
+
+    doc = Document(str(orig_soup))
     reader_html = doc.summary()
+    raw_title = doc.title()
+    doc_title = raw_title if raw_title and raw_title != '[no-title]' else None
 
     soup = BeautifulSoup(reader_html, 'html.parser')
+
+    # Re-add title that readability extracts separately
+    if doc_title:
+        content = soup.find('div') or soup
+        first_child = content.find()
+        if first_child:
+            h1 = soup.new_tag('h1')
+            h1.string = doc_title
+            first_child.insert_before(h1)
+
     for tag in soup.find_all(True):
         tag.attrs = {k: v for k, v in tag.attrs.items() if v}
     for img in soup.find_all('img'):
@@ -74,7 +94,71 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
         if href:
             a['href'] = urljoin(base_url, href)
 
-    return str(soup)
+    # Re-inject content images that readability dropped
+    def _img_key(url):
+        m = re.search(r'([\w-]{20,}\.\w{3,4})$', url.split('?')[0].split('%2F')[-1])
+        return m.group(1) if m else url
+
+    reader_img_keys = {_img_key(img.get('src', '')) for img in soup.find_all('img')}
+    text_nodes = list(soup.find_all(string=True))
+    article = orig_soup.find('article') or orig_soup.find('main') or orig_soup
+    for img in article.find_all('img'):
+        src = img.get('src', '')
+        abs_src = urljoin(base_url, src) if src else ''
+        key = _img_key(abs_src)
+        if not abs_src or key in reader_img_keys:
+            continue
+        w = str(img.get('width', '999')).split('.')[0]
+        h = str(img.get('height', '999')).split('.')[0]
+        if (w.isdigit() and int(w) < 100) or (h.isdigit() and int(h) < 50):
+            continue
+
+        alt = img.get('alt', '')
+        prev_text = ''
+        for sib in img.previous_siblings:
+            t = getattr(sib, 'get_text', lambda: str(sib))()
+            if t.strip():
+                prev_text = t.strip()
+                break
+
+        new_img = soup.new_tag('img', src=abs_src)
+        if alt:
+            new_img['alt'] = alt
+        if w.isdigit() and int(w) > 0:
+            new_img['width'] = w
+        if h.isdigit() and int(h) > 0:
+            new_img['height'] = h
+
+        inserted = False
+        if prev_text:
+            words = prev_text[-40:].split()
+            search = ' '.join(words[-4:]) if len(words) >= 4 else prev_text[-20:]
+            for tn in text_nodes:
+                if search in str(tn):
+                    parent = tn.find_parent()
+                    if parent:
+                        parent.insert_after(new_img)
+                        inserted = True
+                        break
+
+        if not inserted:
+            paras = soup.find_all('p')
+            if paras:
+                ratio = len(reader_img_keys) / max(len(paras), 1)
+                insert_at = min(int(ratio * len(paras)), len(paras) - 1)
+                paras[insert_at].insert_after(new_img)
+
+        reader_img_keys.add(key)
+
+    title = doc_title
+    if not title:
+        title_tag = BeautifulSoup(html, 'html.parser').find('title')
+        title = title_tag.string.strip() if title_tag and title_tag.string else None
+    if not title:
+        first_h = soup.find(['h1', 'h2', 'h3'])
+        title = first_h.get_text().strip() if first_h else None
+
+    return str(soup), title or ''
 
 
 def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> dict | None:

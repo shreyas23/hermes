@@ -61,6 +61,13 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        ''')
+
 
 @contextmanager
 def get_db():
@@ -270,6 +277,36 @@ def remove_from_collection(collection_id, item_id):
 def delete_collection(collection_id):
     with get_db() as db:
         db.execute('DELETE FROM collections WHERE id = ?', (collection_id,))
+
+
+DEFAULTS = {
+    'tts_engine': 'edge',
+    'edge_voice': 'en-US-AriaNeural',
+    'say_voice': 'Samantha',  # Download Siri voices from System Settings > Accessibility > Spoken Content
+}
+
+
+def get_setting(key):
+    with get_db() as db:
+        row = db.execute('SELECT value FROM settings WHERE key = ?', (key,)).fetchone()
+        return row[0] if row else DEFAULTS.get(key)
+
+
+def set_setting(key, value):
+    with get_db() as db:
+        db.execute(
+            'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?',
+            (key, value, value)
+        )
+
+
+def get_all_settings():
+    result = dict(DEFAULTS)
+    with get_db() as db:
+        rows = db.execute('SELECT key, value FROM settings').fetchall()
+        for row in rows:
+            result[row[0]] = row[1]
+    return result
 
 
 def item_audio_dir(item_id):
