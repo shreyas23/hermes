@@ -127,8 +127,18 @@ function renderItemList(items) {
       e.stopPropagation();
       const actions = [
         { label: 'Play', onClick: () => onItemOpen?.(item.id) },
-        { separator: true },
       ];
+      if (item.interrupted) {
+        actions.push({
+          label: 'Regenerate',
+          onClick: async () => {
+            const data = await api(`/api/library/${item.id}/retry`, { method: 'POST' });
+            if (data.error) return;
+            loadView(state.currentView);
+          },
+        });
+      }
+      actions.push({ separator: true });
       const data = await api('/api/collections', { showError: false });
       if (data.collections?.length) {
         data.collections.forEach(c => {

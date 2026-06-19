@@ -80,6 +80,10 @@ def library_item(item_id):
     item = get_item(item_id)
     if not item:
         return jsonify({'error': 'Not found'}), 404
+    audio_ready = bool(item['audio_ready'])
+    generating = not audio_ready and is_generating(item['id'])
+    item['generating'] = generating
+    item['interrupted'] = not audio_ready and not generating
     return jsonify({'item': item})
 
 

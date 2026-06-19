@@ -8,6 +8,8 @@ import { initSettings } from './settings.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
+const interruptedState = document.getElementById('interrupted-state');
+const interruptedRetry = document.getElementById('interrupted-retry');
 const miniPlayer = document.getElementById('mini-player');
 const controlsEl = document.querySelector('.controls');
 
@@ -88,6 +90,11 @@ async function openItem(itemId) {
 
   document.querySelectorAll('.item').forEach(el => el.classList.remove('is-active'));
 
+  if (!data.item.audio_ready && data.item.interrupted) {
+    showView('interrupted');
+    return;
+  }
+
   showView('player');
   renderContent(data.item);
 
@@ -99,7 +106,17 @@ async function openItem(itemId) {
   }
 }
 
+interruptedRetry.addEventListener('click', async () => {
+  const itemId = state.currentItemId;
+  if (!itemId) return;
+  const data = await api(`/api/library/${itemId}/retry`, { method: 'POST' });
+  if (data.error) return;
+  showView('empty');
+  loadView(state.currentView);
+});
+
 function showView(view) {
   emptyState.classList.toggle('is-hidden', view !== 'empty');
   playerState.classList.toggle('is-visible', view === 'player');
+  interruptedState.classList.toggle('is-visible', view === 'interrupted');
 }
