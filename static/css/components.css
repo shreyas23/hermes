@@ -63,6 +63,10 @@
   transition: width var(--transition-base);
 }
 
+.item__progress--gen .item__progress-fill {
+  background: var(--warning);
+}
+
 .item__delete {
   background: none;
   border: none;

@@ -98,10 +98,14 @@ function renderItemList(items) {
         : '<span class="badge badge--generating">generating</span>';
     }
     let progress = '';
-    if (item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished && item.total_duration_ms > 0) {
+    if (item.audio_ready && item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished && item.total_duration_ms > 0) {
       const pct = Math.round((item.progress.current_time_ms / item.total_duration_ms) * 100);
       progress = `<div class="item__progress"><div class="item__progress-fill" style="width:${pct}%"></div></div>`;
     }
+
+    const genBar = !item.audio_ready
+      ? `<div class="item__progress item__progress--gen" data-gen-id="${item.id}"><div class="item__progress-fill" style="width:0%"></div></div>`
+      : '';
 
     el.innerHTML = `
       <div class="item__body">
@@ -112,6 +116,7 @@ function renderItemList(items) {
           ${badge}
         </div>
         ${progress}
+        ${genBar}
       </div>
       <button class="item__delete" title="Delete">&times;</button>
     `;
@@ -162,6 +167,11 @@ function renderItemList(items) {
 
     itemList.appendChild(el);
   });
+}
+
+export function updateGenerationProgress(itemId, pct) {
+  const bar = itemList.querySelector(`[data-gen-id="${itemId}"] .item__progress-fill`);
+  if (bar) bar.style.width = `${pct}%`;
 }
 
 export async function loadCollections() {

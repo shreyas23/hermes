@@ -1,6 +1,6 @@
 import { api, connectSSE } from './api.js';
 import { state } from './state.js';
-import { initSidebar, loadView, loadCollections } from './sidebar.js';
+import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
 import { initTeleprompter, renderSentences, highlightCurrentSentence } from './teleprompter.js';
 import { initPlayer, loadAudio, stop, saveProgress, seekToSentence } from './player.js';
 import { initModal } from './modal.js';
@@ -20,6 +20,7 @@ const readerView = document.getElementById('reader-view');
 const readerContent = document.getElementById('reader-content');
 const tabListen = document.getElementById('tab-listen');
 const tabRead = document.getElementById('tab-read');
+const controlsEl = document.querySelector('.controls');
 
 // --- Init ---
 initSidebar({
@@ -51,11 +52,8 @@ initModal({
 
 connectSSE({
   generation_progress: (data) => {
-    if (data.item_id === state.currentItemId) {
-      const pct = Math.round((data.done / data.total) * 100);
-      genProgressFill.style.width = `${pct}%`;
-      genStatus.textContent = `Generating audio... ${pct}%`;
-    }
+    const pct = Math.round((data.done / data.total) * 100);
+    updateGenerationProgress(data.item_id, pct);
   },
   generation_complete: (data) => {
     if (data.item_id === state.currentItemId) {
@@ -166,33 +164,21 @@ async function openItem(itemId) {
   // Re-highlight active item in sidebar
   document.querySelectorAll('.item').forEach(el => el.classList.remove('is-active'));
 
-  if (!data.item.audio_ready) {
-    showView('generating');
-    genTitle.textContent = data.item.title;
-    const isRunning = await api(`/api/library/${itemId}`).then(d => !d.item?.audio_ready);
-    // Check if generation is actually running by looking at the summary
-    const listData = await api(`/api/library?view=recent`);
-    const itemSummary = listData.items?.find(i => i.id === itemId);
-    const interrupted = itemSummary?.interrupted;
+  renderReader(data.item);
+  renderSentences(data.item.sentences, data.item.images || [], data.item.id);
 
-    if (interrupted) {
-      genStatus.textContent = 'Generation was interrupted';
-      genProgressFill.style.width = '0%';
-      genRetry.classList.remove('is-hidden');
-      genCancel.classList.remove('is-hidden');
-    } else {
-      genStatus.textContent = 'Generating audio...';
-      genProgressFill.style.width = '0%';
-      genRetry.classList.add('is-hidden');
-      genCancel.classList.remove('is-hidden');
-    }
+  if (!data.item.audio_ready) {
+    showView('player');
+    setMode('read');
+    tabListen.classList.add('is-hidden');
+    controlsEl.classList.add('is-hidden');
     return;
   }
 
+  tabListen.classList.remove('is-hidden');
+  controlsEl.classList.remove('is-hidden');
   showView('player');
   setMode('listen');
-  renderSentences(data.item.sentences, data.item.images || [], data.item.id);
-  renderReader(data.item);
   loadAudio(data.item);
 }
 
