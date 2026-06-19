@@ -34,37 +34,23 @@ def extract_with_images(file_path: str, image_dir: str = None) -> dict | None:
 
 
 def clean_html_for_reader(html: str, base_url: str) -> str:
+    from readability import Document
     from bs4 import BeautifulSoup
 
-    soup = BeautifulSoup(html, 'html.parser')
-    for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe', 'form', 'noscript']):
-        tag.decompose()
+    doc = Document(html)
+    reader_html = doc.summary()
 
-    body = soup.find('article') or soup.find('main') or soup.find('body') or soup
+    soup = BeautifulSoup(reader_html, 'html.parser')
+    for img in soup.find_all('img'):
+        src = img.get('src', '')
+        if src:
+            img['src'] = urljoin(base_url, src)
+    for a in soup.find_all('a'):
+        href = a.get('href', '')
+        if href:
+            a['href'] = urljoin(base_url, href)
 
-    KEEP_TAGS = {
-        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
-        'strong', 'b', 'em', 'i', 'u', 'sub', 'sup', 'br',
-        'img', 'figure', 'figcaption', 'picture', 'source',
-        'table', 'thead', 'tbody', 'tr', 'th', 'td',
-        'a', 'span', 'div', 'section',
-        'math', 'svg',
-    }
-    KEEP_ATTRS = {'src', 'alt', 'href', 'title', 'width', 'height', 'srcset'}
-
-    for tag in body.find_all(True):
-        if tag.name not in KEEP_TAGS:
-            tag.unwrap()
-        else:
-            attrs = {k: v for k, v in tag.attrs.items() if k in KEEP_ATTRS and v}
-            if tag.name == 'img' and 'src' in attrs:
-                attrs['src'] = urljoin(base_url, attrs['src'])
-            if tag.name == 'a' and 'href' in attrs:
-                attrs['href'] = urljoin(base_url, attrs['href'])
-            tag.attrs = attrs
-
-    return str(body)
+    return str(soup)
 
 
 def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> dict | None:
