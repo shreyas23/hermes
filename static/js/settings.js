@@ -21,33 +21,29 @@ export function initSettings() {
   });
 }
 
+function populateSelect(select, voices, labelFn) {
+  select.innerHTML = '';
+  voices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = labelFn(v);
+    select.appendChild(opt);
+  });
+}
+
 async function open() {
-  const settings = await api('/api/settings');
+  const [settings, edgeVoices, sayVoices] = await Promise.all([
+    api('/api/settings'),
+    api('/api/voices?engine=edge'),
+    api('/api/voices?engine=say'),
+  ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
 
-  const edgeVoices = await api('/api/voices?engine=edge');
-  edgeVoiceSelect.innerHTML = '';
-  if (edgeVoices.voices) {
-    edgeVoices.voices.forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = `${v.name} (${v.gender})`;
-      edgeVoiceSelect.appendChild(opt);
-    });
-  }
+  if (edgeVoices.voices) populateSelect(edgeVoiceSelect, edgeVoices.voices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';
 
-  const sayVoices = await api('/api/voices?engine=say');
-  sayVoiceSelect.innerHTML = '';
-  if (sayVoices.voices) {
-    sayVoices.voices.forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = v.name;
-      sayVoiceSelect.appendChild(opt);
-    });
-  }
+  if (sayVoices.voices) populateSelect(sayVoiceSelect, sayVoices.voices, v => v.name);
   sayVoiceSelect.value = settings.say_voice || 'Samantha';
 
   const isEdge = engineSelect.value === 'edge';

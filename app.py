@@ -205,18 +205,8 @@ def import_url():
     if not downloaded:
         return jsonify({'error': 'Could not download page'}), 400
 
-    from readability import Document as ReadabilityDoc
-    reader_html = clean_html_for_reader(downloaded, url)
-
-    rdoc = ReadabilityDoc(downloaded)
-    title = rdoc.title() if rdoc.title() and rdoc.title() != '[no-title]' else None
-    if not title:
-        from bs4 import BeautifulSoup as BS
-        title_tag = BS(downloaded, 'html.parser').find('title')
-        title = title_tag.string.strip() if title_tag and title_tag.string else None
-    if not title:
-        first_h = BeautifulSoup(reader_html, 'html.parser').find(['h1', 'h2', 'h3'])
-        title = first_h.get_text().strip() if first_h else url
+    reader_html, title = clean_html_for_reader(downloaded, url)
+    title = title or url
     if not reader_html or not reader_html.strip():
         return jsonify({'error': 'Could not extract article text'}), 400
 

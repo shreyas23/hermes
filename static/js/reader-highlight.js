@@ -9,15 +9,6 @@ let lastHighlightedIndex = -1;
 let paragraphMap = [];
 
 export function initReaderHighlight() {
-  container.parentElement.addEventListener('scroll', () => {
-    if (!state.playing) return;
-    clearTimeout(userScrollTimeout);
-    userScrollTimeout = setTimeout(() => {
-      autoFollow = false;
-      updateFollowButton();
-    }, 50);
-  }, { passive: true, capture: true });
-
   container.addEventListener('scroll', () => {
     if (!state.playing) return;
     clearTimeout(userScrollTimeout);

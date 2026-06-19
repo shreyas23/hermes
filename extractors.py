@@ -33,7 +33,7 @@ def extract_with_images(file_path: str, image_dir: str = None) -> dict | None:
         return None
 
 
-def clean_html_for_reader(html: str, base_url: str) -> str:
+def clean_html_for_reader(html: str, base_url: str) -> tuple[str, str]:
     from readability import Document
     from bs4 import BeautifulSoup
 
@@ -63,9 +63,8 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
 
     doc = Document(str(orig_soup))
     reader_html = doc.summary()
-    doc_title = doc.title()
-    if doc_title == '[no-title]':
-        doc_title = None
+    raw_title = doc.title()
+    doc_title = raw_title if raw_title and raw_title != '[no-title]' else None
 
     soup = BeautifulSoup(reader_html, 'html.parser')
 
@@ -97,12 +96,11 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
 
     # Re-inject content images that readability dropped
     def _img_key(url):
-        """Extract base image path, ignoring CDN resize params."""
-        import re
         m = re.search(r'([\w-]{20,}\.\w{3,4})$', url.split('?')[0].split('%2F')[-1])
         return m.group(1) if m else url
 
     reader_img_keys = {_img_key(img.get('src', '')) for img in soup.find_all('img')}
+    text_nodes = list(soup.find_all(string=True))
     article = orig_soup.find('article') or orig_soup.find('main') or orig_soup
     for img in article.find_all('img'):
         src = img.get('src', '')
@@ -135,7 +133,7 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
         if prev_text:
             words = prev_text[-40:].split()
             search = ' '.join(words[-4:]) if len(words) >= 4 else prev_text[-20:]
-            for tn in soup.find_all(string=True):
+            for tn in text_nodes:
                 if search in str(tn):
                     parent = tn.find_parent()
                     if parent:
@@ -152,7 +150,15 @@ def clean_html_for_reader(html: str, base_url: str) -> str:
 
         reader_img_keys.add(key)
 
-    return str(soup)
+    title = doc_title
+    if not title:
+        title_tag = BeautifulSoup(html, 'html.parser').find('title')
+        title = title_tag.string.strip() if title_tag and title_tag.string else None
+    if not title:
+        first_h = soup.find(['h1', 'h2', 'h3'])
+        title = first_h.get_text().strip() if first_h else None
+
+    return str(soup), title or ''
 
 
 def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> dict | None:
