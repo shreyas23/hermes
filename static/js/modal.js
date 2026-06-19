@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { toastSuccess } from './toast.js';
 import { escHtml } from './utils.js';
 
 const backdrop = document.getElementById('import-modal');
@@ -49,7 +50,7 @@ async function importUrl() {
   const data = await api('/api/import/url', { body: { url } });
   btn.textContent = 'Import Article';
   btn.disabled = false;
-  if (data.error) { alert(data.error); return; }
+  if (data.error) return;
   document.getElementById('import-url').value = '';
   close();
   onImported?.(data.item_id);
@@ -59,7 +60,7 @@ async function importFile() {
   const path = document.getElementById('import-file-path').value.trim();
   if (!path) return;
   const data = await api('/api/import/file', { body: { path } });
-  if (data.error) { alert(data.error); return; }
+  if (data.error) return;
   document.getElementById('import-file-path').value = '';
   close();
   onImported?.(data.item_id);
@@ -69,7 +70,7 @@ async function scanFolder() {
   const folder = document.getElementById('import-folder-path').value.trim();
   if (!folder) return;
   const data = await api('/api/import/folder', { body: { folder } });
-  if (data.error) { alert(data.error); return; }
+  if (data.error) return;
   const results = document.getElementById('folder-scan-results');
   results.innerHTML = '';
   data.files.forEach(f => {
@@ -94,7 +95,7 @@ async function importText() {
   const text = document.getElementById('import-text-content').value.trim();
   if (!text) return;
   const data = await api('/api/import/text', { body: { title, text } });
-  if (data.error) { alert(data.error); return; }
+  if (data.error) return;
   document.getElementById('import-text-title').value = '';
   document.getElementById('import-text-content').value = '';
   close();

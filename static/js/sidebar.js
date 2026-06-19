@@ -43,11 +43,13 @@ export async function loadView(view) {
     case 'texts': params = '?source_type=text'; break;
     default: params = ''; break;
   }
+  itemList.innerHTML = '<div class="loading-overlay"><div class="spinner spinner--sm"></div></div>';
   const data = await api(`/api/library${params}`);
   if (data.items) renderItemList(data.items);
 }
 
 async function loadCollection(id) {
+  itemList.innerHTML = '<div class="loading-overlay"><div class="spinner spinner--sm"></div></div>';
   const data = await api(`/api/library?view=collection&collection_id=${id}`);
   if (data.items) renderItemList(data.items);
 }

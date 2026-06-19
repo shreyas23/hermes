@@ -1,3 +1,5 @@
+import { toastError } from './toast.js';
+
 export async function api(path, opts = {}) {
   try {
     const res = await fetch(path, {
@@ -5,9 +7,14 @@ export async function api(path, opts = {}) {
       headers: opts.body ? { 'Content-Type': 'application/json' } : {},
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
-    return res.json();
+    const data = await res.json();
+    if (data.error && opts.showError !== false) {
+      toastError(data.error);
+    }
+    return data;
   } catch (e) {
     console.error('API error:', path, e);
+    toastError('Connection error');
     return { error: e.message };
   }
 }
