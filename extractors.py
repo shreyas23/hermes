@@ -65,33 +65,26 @@ def extract_url_with_images(html: str, base_url: str, image_dir: str = None) -> 
                 char_offset += len(text) + 1
 
     full_text = ' '.join(b['content'] for b in blocks if b['type'] == 'text')
-    images = [b for b in blocks if b['type'] == 'image' and b.get('filename')]
+    total_chars = char_offset or 1
+    images = []
+    for b in blocks:
+        if b['type'] == 'image' and b.get('filename'):
+            b['total_chars'] = total_chars
+            images.append(b)
 
     return {'text': full_text, 'images': images}
 
 
 def map_images_to_sentences(images: list, text: str, sentences: list) -> list:
-    if not images:
+    if not images or not sentences:
         return []
-
-    sentence_offsets = []
-    offset = 0
-    for sent in sentences:
-        idx = text.find(sent, offset)
-        if idx == -1:
-            idx = offset
-        sentence_offsets.append(idx)
-        offset = idx + len(sent)
 
     mapped = []
     for img in images:
         char_pos = img.get('char_offset', 0)
-        after_sentence = 0
-        for i, so in enumerate(sentence_offsets):
-            if so <= char_pos:
-                after_sentence = i
-            else:
-                break
+        total_chars = img.get('total_chars', 1) or 1
+        ratio = char_pos / total_chars
+        after_sentence = min(int(ratio * len(sentences)), len(sentences) - 1)
         mapped.append({
             'after_sentence': after_sentence,
             'filename': img.get('filename', ''),
@@ -150,7 +143,7 @@ def _extract_md(path: str, image_dir: str = None) -> dict:
             else:
                 continue
             if local:
-                images.append({'type': 'image', 'filename': local, 'alt': alt, 'char_offset': match.start()})
+                images.append({'type': 'image', 'filename': local, 'alt': alt, 'char_offset': match.start(), 'total_chars': len(text) or 1})
 
     text = re.sub(r'```[\s\S]*?```', '', text)
     text = re.sub(r'`[^`]+`', '', text)
@@ -205,6 +198,9 @@ def _extract_pdf(path: str, image_dir: str = None) -> dict:
         char_offset += len(text or '') + 2
 
     doc.close()
+    total_chars = char_offset or 1
+    for img in images:
+        img['total_chars'] = total_chars
     return {'text': '\n\n'.join(pages), 'images': images}
 
 
@@ -240,6 +236,9 @@ def _extract_docx(path: str, image_dir: str = None) -> dict:
 
         char_offset += len(para.text) + 2
 
+    total_chars = char_offset or 1
+    for img in images:
+        img['total_chars'] = total_chars
     return {'text': '\n\n'.join(texts), 'images': images}
 
 
