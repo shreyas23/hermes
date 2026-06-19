@@ -219,11 +219,15 @@ def import_url():
         if title_tag and title_tag.string:
             title = title_tag.string.strip()
 
-    text_only = trafilatura.extract(downloaded, include_comments=False, include_tables=False)
-    if not text_only or not text_only.strip():
+    reader_html = clean_html_for_reader(downloaded, url)
+    if not reader_html or not reader_html.strip():
         return jsonify({'error': 'Could not extract article text'}), 400
 
-    reader_html = clean_html_for_reader(downloaded, url)
+    from bs4 import BeautifulSoup
+    text_only = BeautifulSoup(reader_html, 'html.parser').get_text(separator='\n', strip=True)
+    if not text_only.strip():
+        return jsonify({'error': 'Could not extract article text'}), 400
+
     sentences = _split(text_only)
 
     item_id = add_item(
