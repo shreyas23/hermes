@@ -886,8 +886,8 @@
 }
 
 .toast {
-  background: var(--text-primary);
-  color: var(--text-inverse);
+  background: var(--toast-bg);
+  color: var(--toast-text);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);

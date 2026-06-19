@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes</title>
   <link rel="stylesheet" href="/static/css/tokens.css">
+  <script>
+    const t = localStorage.getItem('hermes-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', t);
+  </script>
   <link rel="stylesheet" href="/static/css/layout.css">
   <link rel="stylesheet" href="/static/css/components.css">
 </head>
@@ -14,7 +19,6 @@
       <div class="sidebar__header">
         <h1 class="sidebar__title">Hermes</h1>
         <div class="sidebar__actions">
-          <button class="sidebar__icon-btn" id="btn-settings" title="Settings">&#x2699;</button>
           <button class="sidebar__add" id="btn-add" title="Import">+</button>
         </div>
       </div>
@@ -38,6 +42,13 @@
       </nav>
 
       <div class="item-list" id="item-list"></div>
+
+      <div class="sidebar__footer">
+        <button class="sidebar__icon-btn" id="btn-settings" title="Settings">&#x2699;</button>
+        <button class="sidebar__theme-toggle" id="btn-theme" title="Toggle dark mode">
+          <span class="sidebar__theme-icon" id="theme-icon">&#x263E;</span>
+        </button>
+      </div>
     </aside>
 
     <main class="main">

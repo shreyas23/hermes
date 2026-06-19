@@ -184,6 +184,34 @@ body {
   color: var(--accent);
 }
 
+/* Sidebar footer */
+.sidebar__footer {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar__theme-toggle {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: color var(--transition-fast), background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar__theme-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
 /* Item list */
 .item-list {
   flex: 1;

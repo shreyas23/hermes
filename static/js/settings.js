@@ -7,6 +7,11 @@ const edgeVoiceSelect = document.getElementById('setting-edge-voice');
 const sayVoiceSelect = document.getElementById('setting-say-voice');
 const edgeGroup = document.getElementById('edge-voice-group');
 const sayGroup = document.getElementById('say-voice-group');
+const themeBtn = document.getElementById('btn-theme');
+const themeIcon = document.getElementById('theme-icon');
+
+let cachedEdgeVoices = null;
+let cachedSayVoices = null;
 
 export function initSettings() {
   document.getElementById('btn-settings').addEventListener('click', open);
@@ -19,6 +24,9 @@ export function initSettings() {
     edgeGroup.classList.toggle('is-hidden', !isEdge);
     sayGroup.classList.toggle('is-hidden', isEdge);
   });
+
+  updateThemeIcon();
+  themeBtn.addEventListener('click', toggleTheme);
 }
 
 function populateSelect(select, voices, labelFn) {
@@ -32,29 +40,45 @@ function populateSelect(select, voices, labelFn) {
 }
 
 async function open() {
+  modal.classList.add('is-visible');
+
   const [settings, edgeVoices, sayVoices] = await Promise.all([
     api('/api/settings'),
-    api('/api/voices?engine=edge'),
-    api('/api/voices?engine=say'),
+    cachedEdgeVoices ?? api('/api/voices?engine=edge').then(r => (cachedEdgeVoices = r.voices)),
+    cachedSayVoices ?? api('/api/voices?engine=say').then(r => (cachedSayVoices = r.voices)),
   ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
 
-  if (edgeVoices.voices) populateSelect(edgeVoiceSelect, edgeVoices.voices, v => `${v.name} (${v.gender})`);
+  if (edgeVoices) populateSelect(edgeVoiceSelect, edgeVoices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';
 
-  if (sayVoices.voices) populateSelect(sayVoiceSelect, sayVoices.voices, v => v.name);
+  if (sayVoices) populateSelect(sayVoiceSelect, sayVoices, v => v.name);
   sayVoiceSelect.value = settings.say_voice || 'Samantha';
 
   const isEdge = engineSelect.value === 'edge';
   edgeGroup.classList.toggle('is-hidden', !isEdge);
   sayGroup.classList.toggle('is-hidden', isEdge);
-
-  modal.classList.add('is-visible');
 }
 
 function close() {
   modal.classList.remove('is-visible');
+}
+
+function isDark() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function updateThemeIcon() {
+  themeIcon.textContent = isDark() ? '☀' : '☾';
+}
+
+function toggleTheme() {
+  const theme = isDark() ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('hermes-theme', theme);
+  updateThemeIcon();
+  api('/api/settings', { body: { theme } });
 }
 
 async function save() {
