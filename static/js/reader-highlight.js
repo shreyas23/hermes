@@ -6,9 +6,9 @@ const followBtn = document.getElementById('btn-follow');
 let autoFollow = true;
 let userScrollTimeout = null;
 let lastHighlightedIndex = -1;
-let paragraphMap = [];
+let sentenceElements = [];
 
-export function initReaderHighlight() {
+export function initReaderHighlight(onSentenceClick) {
   container.addEventListener('scroll', () => {
     if (!state.playing) return;
     clearTimeout(userScrollTimeout);
@@ -23,11 +23,18 @@ export function initReaderHighlight() {
     followBtn.classList.remove('is-visible');
     scrollToActive();
   });
+
+  if (onSentenceClick) {
+    container.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-si]');
+      if (el) onSentenceClick(parseInt(el.dataset.si));
+    });
+  }
 }
 
 export function renderContent(item) {
   container.innerHTML = '';
-  paragraphMap = [];
+  sentenceElements = [];
   lastHighlightedIndex = -1;
   autoFollow = true;
   followBtn.classList.remove('is-visible');
@@ -35,64 +42,18 @@ export function renderContent(item) {
   if (item.reader_html) {
     container.innerHTML = item.reader_html;
   } else {
-    item.sentences.forEach(text => {
+    item.sentences.forEach((text, i) => {
       const p = document.createElement('p');
       p.className = 'reader__paragraph';
+      p.dataset.si = i;
       p.textContent = text;
       container.appendChild(p);
     });
   }
 
-  buildParagraphMap(item.sentences);
-}
-
-function buildParagraphMap(sentences) {
-  paragraphMap = [];
-
-  const textEls = [];
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, {
-    acceptNode: (node) => {
-      const tag = node.tagName.toLowerCase();
-      if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'td', 'th'].includes(tag)) {
-        return NodeFilter.FILTER_ACCEPT;
-      }
-      return NodeFilter.FILTER_SKIP;
-    }
+  container.querySelectorAll('[data-si]').forEach(el => {
+    sentenceElements[parseInt(el.dataset.si)] = el;
   });
-
-  let node;
-  while (node = walker.nextNode()) {
-    const text = node.textContent.trim();
-    if (text.length > 10) {
-      textEls.push({ el: node, text });
-    }
-  }
-
-  if (textEls.length === 0) return;
-
-  for (let si = 0; si < sentences.length; si++) {
-    const sentence = sentences[si];
-    const words = sentence.split(/\s+/).slice(0, 6).join(' ').toLowerCase();
-    if (words.length < 5) continue;
-
-    let bestMatch = null;
-    let bestScore = 0;
-
-    for (let pi = 0; pi < textEls.length; pi++) {
-      const pText = textEls[pi].text.toLowerCase();
-      if (pText.includes(words)) {
-        const score = words.length;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = pi;
-        }
-      }
-    }
-
-    if (bestMatch !== null) {
-      paragraphMap[si] = textEls[bestMatch].el;
-    }
-  }
 }
 
 export function getCurrentSentenceIndex() {
@@ -119,7 +80,7 @@ export function highlightCurrentSentence() {
 
   container.querySelectorAll('.is-reading').forEach(el => el.classList.remove('is-reading'));
 
-  const el = paragraphMap[index];
+  const el = sentenceElements[index];
   if (el) {
     el.classList.add('is-reading');
     if (autoFollow) scrollToActive();
@@ -131,13 +92,12 @@ function scrollToActive() {
   const el = container.querySelector('.is-reading');
   if (!el) return;
 
-  const scrollParent = container;
-  const containerRect = scrollParent.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
-  const target = scrollParent.scrollTop + elRect.top - containerRect.top - containerRect.height / 3;
+  const target = container.scrollTop + elRect.top - containerRect.top - containerRect.height / 3;
 
   autoFollow = true;
-  scrollParent.scrollTo({ top: target, behavior: 'smooth' });
+  container.scrollTo({ top: target, behavior: 'smooth' });
 }
 
 function updateFollowButton() {

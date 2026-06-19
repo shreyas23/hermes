@@ -7,6 +7,103 @@ from urllib.parse import urljoin
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.md', '.txt', '.rtf', '.html', '.htm'}
 
 
+def inject_sentence_spans(html, sentences):
+    """Wrap each sentence's text in <span data-si="N"> inside reader HTML."""
+    from bs4 import BeautifulSoup, NavigableString
+    from collections import defaultdict
+
+    soup = BeautifulSoup(html, 'html.parser')
+
+    def norm(w):
+        return re.sub(r"[^\w']", '', w.lower())
+
+    # Build word stream from all text nodes
+    words = []
+    for text_node in soup.find_all(string=True):
+        for m in re.finditer(r'\S+', str(text_node)):
+            n = norm(m.group())
+            if n:
+                words.append((n, text_node, m.start(), m.end()))
+
+    # Match each sentence to word positions
+    matches = []
+    wi = 0
+    for si, sent in enumerate(sentences):
+        sw = [norm(w) for w in sent.split() if norm(w)]
+        if not sw:
+            continue
+
+        plen = min(4, len(sw))
+        found = -1
+        for i in range(wi, len(words) - plen + 1):
+            if all(words[i + j][0] == sw[j] for j in range(plen)):
+                found = i
+                break
+
+        if found == -1:
+            continue
+
+        end = found
+        for j in range(len(sw)):
+            if found + j >= len(words):
+                break
+            if words[found + j][0] == sw[j]:
+                end = found + j
+            else:
+                break
+
+        matches.append((si, found, end))
+        wi = end + 1
+
+    # Separate single-node vs multi-node matches
+    single = defaultdict(list)  # text_node id -> [(si, start_off, end_off, text_node)]
+    multi = []
+
+    for si, sw_idx, ew_idx in matches:
+        start_node, start_off = words[sw_idx][1], words[sw_idx][2]
+        end_node, end_off = words[ew_idx][1], words[ew_idx][3]
+
+        if start_node is end_node:
+            single[id(start_node)].append((si, start_off, end_off, start_node))
+        else:
+            multi.append((si, start_node))
+
+    # Inject spans for single-node sentences (grouped by text node)
+    for entries in single.values():
+        entries.sort(key=lambda x: x[1])
+        text_node = entries[0][3]
+        text = str(text_node)
+
+        parts = []
+        pos = 0
+        for si, start_off, end_off, _ in entries:
+            if start_off > pos:
+                parts.append(NavigableString(text[pos:start_off]))
+            span = soup.new_tag('span')
+            span['data-si'] = str(si)
+            span.string = text[start_off:end_off]
+            parts.append(span)
+            pos = end_off
+        if pos < len(text):
+            parts.append(NavigableString(text[pos:]))
+
+        if parts:
+            first = parts[0]
+            text_node.replace_with(first)
+            prev = first
+            for part in parts[1:]:
+                prev.insert_after(part)
+                prev = part
+
+    # Multi-node sentences: tag nearest block parent
+    for si, start_node in multi:
+        block = start_node.find_parent(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre'])
+        if block:
+            block['data-si'] = str(si)
+
+    return str(soup)
+
+
 def extract_text(file_path: str) -> str | None:
     result = extract_with_images(file_path)
     return result['text'] if result else None

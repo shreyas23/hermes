@@ -487,12 +487,14 @@
   font-weight: var(--font-semibold);
 }
 
-/* Reading highlight */
-.is-reading {
-  background: var(--accent-subtle);
-  border-left: 3px solid var(--accent);
-  padding-left: var(--space-4);
+/* Reading highlight — sentence-level */
+[data-si] {
+  cursor: pointer;
   border-radius: var(--radius-sm);
+}
+
+[data-si].is-reading {
+  background: rgba(0, 122, 255, 0.2);
   transition: background var(--transition-base);
 }
 

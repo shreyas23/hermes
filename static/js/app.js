@@ -2,7 +2,7 @@ import { api, connectSSE } from './api.js';
 import { state } from './state.js';
 import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
 import { initReaderHighlight, renderContent } from './reader-highlight.js';
-import { initPlayer, loadAudio, stop, saveProgress } from './player.js';
+import { initPlayer, loadAudio, stop, saveProgress, seekToSentence } from './player.js';
 import { initModal } from './modal.js';
 import { initSettings } from './settings.js';
 
@@ -26,7 +26,9 @@ initSidebar({
   },
 });
 
-initReaderHighlight();
+initReaderHighlight((si) => {
+  if (state.currentItem?.audio_ready) seekToSentence(si);
+});
 initPlayer();
 initSettings();
 
