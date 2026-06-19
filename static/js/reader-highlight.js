@@ -4,6 +4,7 @@ const container = document.getElementById('reader-content');
 const followBtn = document.getElementById('btn-follow');
 const tocBtn = document.getElementById('btn-toc');
 const tocPanel = document.getElementById('reader-toc');
+const readerView = document.getElementById('reader-view');
 
 let autoFollow = true;
 let programmaticScroll = false;
@@ -35,7 +36,8 @@ export function initReaderHighlight(onSentenceClick) {
   }
 
   tocBtn.addEventListener('click', () => {
-    tocPanel.classList.toggle('is-hidden');
+    const open = tocPanel.classList.toggle('is-hidden');
+    readerView.classList.toggle('reader--toc-open', !open);
   });
 }
 
@@ -82,6 +84,7 @@ export function renderContent(item) {
             autoFollow = false;
           }
           tocPanel.classList.add('is-hidden');
+          readerView.classList.remove('reader--toc-open');
         });
       }
       tocPanel.appendChild(el);
@@ -89,6 +92,7 @@ export function renderContent(item) {
   } else {
     tocBtn.classList.add('is-hidden');
     tocPanel.classList.add('is-hidden');
+    readerView.classList.remove('reader--toc-open');
   }
 }
 

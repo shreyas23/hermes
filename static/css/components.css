@@ -203,6 +203,49 @@
   background: var(--accent-hover);
 }
 
+/* Interrupted state */
+.interrupted-state {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.interrupted-state.is-visible {
+  display: flex;
+}
+
+.interrupted-state__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  max-width: 400px;
+  text-align: center;
+}
+
+.interrupted-state__status {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.interrupted-state__retry {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-6);
+  color: var(--text-inverse);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.interrupted-state__retry:hover {
+  background: var(--accent-hover);
+}
+
 /* Controls */
 .controls {
   background: var(--bg-secondary);
@@ -343,6 +386,7 @@
 
 /* Reader view */
 .reader {
+  --toc-width: 300px;
   flex: 1;
   position: relative;
   overflow: hidden;
@@ -357,6 +401,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: left var(--transition-base);
+}
+
+.reader--toc-open .reader__scroll {
+  left: var(--toc-width);
 }
 
 .reader__scroll > * {
@@ -514,7 +563,14 @@
   color: var(--text-secondary);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: color var(--transition-base), background var(--transition-base);
+  transition: color var(--transition-base), background var(--transition-base),
+    left var(--transition-base);
+}
+
+.reader--toc-open .reader__toc-btn {
+  left: calc(var(--toc-width) + var(--space-3));
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .reader__toc-btn:hover {
@@ -529,14 +585,12 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 300px;
-  max-width: 80%;
+  width: var(--toc-width);
   background: var(--bg-elevated);
   border-right: 1px solid var(--border);
   overflow-y: auto;
   z-index: 20;
-  padding: var(--space-4) 0;
-  box-shadow: var(--shadow-lg);
+  padding: var(--space-12) 0 var(--space-4);
 }
 
 .reader__toc-heading {
