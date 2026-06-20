@@ -10,7 +10,7 @@ body {
   font-size: var(--text-base);
   line-height: var(--line-height);
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-primary) 60%, rgba(0, 122, 255, 0.02) 100%);
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -30,8 +30,10 @@ body {
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   user-select: none;
@@ -42,7 +44,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .sidebar__title {
@@ -93,13 +95,13 @@ body {
 /* Search */
 .sidebar__search {
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .sidebar__search-input {
   width: 100%;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
@@ -111,13 +113,13 @@ body {
 
 .sidebar__search-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 /* Nav */
 .nav {
   padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .nav__item {
@@ -192,7 +194,7 @@ body {
 /* Sidebar footer */
 .sidebar__footer {
   padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -10,7 +10,7 @@
 
   /* Colors — light theme, Apple-inspired */
   --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f7;
+  --bg-secondary: rgba(245, 245, 247, 0.72);
   --bg-tertiary: #e8e8ed;
   --bg-elevated: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.04);
@@ -31,9 +31,20 @@
   --success: #34c759;
   --warning: #ff9500;
 
-  --border: #e5e5ea;
-  --border-strong: #d1d1d6;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
   --separator: #c6c6c8;
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-strong: rgba(0, 0, 0, 0.1);
+  --glass-blur: blur(40px) saturate(180%);
+  --glass-blur-heavy: blur(60px) saturate(200%);
+  --glass-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --glass-shadow-elevated: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.1);
+  --glass-inset: rgba(0, 0, 0, 0.04);
 
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
@@ -55,10 +66,10 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-elevated: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.03);
 
   /* Transitions */
   --transition-fast: 0.12s ease;
@@ -74,18 +85,18 @@
   --teleprompter-fade-height: 100px;
 
   /* Toast */
-  --toast-bg: #1d1d1f;
+  --toast-bg: rgba(29, 29, 31, 0.85);
   --toast-text: #ffffff;
 }
 
 /* Dark theme */
 [data-theme="dark"] {
-  --bg-primary: #1c1c1e;
-  --bg-secondary: #2c2c2e;
-  --bg-tertiary: #3a3a3c;
-  --bg-elevated: #2c2c2e;
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(0, 122, 255, 0.15);
+  --bg-primary: #000000;
+  --bg-secondary: rgba(30, 30, 30, 0.72);
+  --bg-tertiary: rgba(58, 58, 60, 0.6);
+  --bg-elevated: rgba(44, 44, 46, 0.82);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-active: rgba(10, 132, 255, 0.18);
 
   --text-primary: #f5f5f7;
   --text-secondary: #a1a1a6;
@@ -98,21 +109,31 @@
   --accent-subtle: rgba(10, 132, 255, 0.12);
   --accent-medium: rgba(10, 132, 255, 0.2);
 
-  --border: #38383a;
-  --border-strong: #48484a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
   --separator: #545456;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-elevated: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --shadow-elevated: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.04);
 
-  --toast-bg: #f5f5f7;
+  --toast-bg: rgba(245, 245, 247, 0.9);
   --toast-text: #1c1c1e;
+
+  /* Glass — dark overrides */
+  --glass-bg: rgba(30, 30, 30, 0.65);
+  --glass-bg-heavy: rgba(30, 30, 30, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.4);
+  --glass-shadow-elevated: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
+  --glass-inset: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] [data-si].is-reading {
-  background: rgba(10, 132, 255, 0.25);
+  background: rgba(10, 132, 255, 0.2);
+  box-shadow: 0 0 20px rgba(10, 132, 255, 0.08);
 }
 
 /* Focus styles */
