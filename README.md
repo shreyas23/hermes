@@ -1,6 +1,7 @@
-# Hermes
+<img width="1097" height="768" alt="hermes" src="https://github.com/user-attachments/assets/2d3c9f9d-8914-4739-8481-a4db8d68504a" />
 
-Turn any document or article into a podcast. Hermes is a macOS desktop app that converts text into speech with a teleprompter-style reading view, a full library system, and podcast-grade playback controls.
+# Hermes
+Turn any document or article into an audiobook. Hermes is a macOS desktop app that converts text into speech with a teleprompter-style reading view, a full library system, and podcast-grade playback controls.
 
 Paste a URL, drop in a PDF, or import a folder of documents — Hermes extracts the text, generates audio using macOS text-to-speech, and gives you a native app experience with scrubbing, speed control, and progress tracking.
 
