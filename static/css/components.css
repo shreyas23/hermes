@@ -299,13 +299,13 @@
   background: var(--accent);
   color: var(--text-inverse);
   font-size: var(--text-lg);
-  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.3);
+  box-shadow: var(--accent-glow);
 }
 
 .controls__btn--play:hover {
   background: var(--accent-hover);
   color: var(--text-inverse);
-  box-shadow: 0 2px 16px rgba(0, 122, 255, 0.4);
+  box-shadow: var(--accent-glow-hover);
 }
 
 .controls__btn--speed {
@@ -363,7 +363,7 @@
   background: var(--accent);
   cursor: pointer;
   transition: transform var(--transition-fast);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), 0 0 8px rgba(0, 122, 255, 0.2);
+  box-shadow: var(--accent-glow-subtle);
 }
 
 .controls__scrubber::-webkit-slider-thumb:hover {
@@ -846,7 +846,7 @@
 
 .modal__input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: var(--accent-focus-ring);
 }
 
 .modal__input--textarea {
@@ -1093,7 +1093,7 @@
 
 .settings-select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: var(--accent-focus-ring);
 }
 
 /* Utility: hidden */

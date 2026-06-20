@@ -5,6 +5,7 @@ const modal = document.getElementById('settings-modal');
 const engineSelect = document.getElementById('setting-engine');
 const edgeVoiceSelect = document.getElementById('setting-edge-voice');
 const sayVoiceSelect = document.getElementById('setting-say-voice');
+const designSelect = document.getElementById('setting-design');
 const edgeGroup = document.getElementById('edge-voice-group');
 const sayGroup = document.getElementById('say-voice-group');
 const themeBtn = document.getElementById('btn-theme');
@@ -23,6 +24,11 @@ export function initSettings() {
     const isEdge = engineSelect.value === 'edge';
     edgeGroup.classList.toggle('is-hidden', !isEdge);
     sayGroup.classList.toggle('is-hidden', isEdge);
+  });
+
+  designSelect.addEventListener('change', () => {
+    document.documentElement.setAttribute('data-design', designSelect.value);
+    localStorage.setItem('hermes-design', designSelect.value);
   });
 
   updateThemeIcon();
@@ -49,6 +55,7 @@ async function open() {
   ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
+  designSelect.value = localStorage.getItem('hermes-design') || 'glass';
 
   if (edgeVoices) populateSelect(edgeVoiceSelect, edgeVoices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';
@@ -84,6 +91,7 @@ function toggleTheme() {
 async function save() {
   await api('/api/settings', {
     body: {
+      design: designSelect.value,
       tts_engine: engineSelect.value,
       edge_voice: edgeVoiceSelect.value,
       say_voice: sayVoiceSelect.value,

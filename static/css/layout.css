@@ -113,7 +113,7 @@ body {
 
 .sidebar__search-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  box-shadow: var(--accent-focus-ring);
 }
 
 /* Nav */
