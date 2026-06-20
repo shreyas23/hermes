@@ -45,10 +45,14 @@
   --glass-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.06);
   --glass-shadow-elevated: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.1);
   --glass-inset: rgba(0, 0, 0, 0.04);
+  --backdrop-blur: blur(8px) saturate(150%);
+  --backdrop-blur-webkit: blur(8px) saturate(150%);
   --accent-glow: 0 2px 12px rgba(0, 122, 255, 0.3);
   --accent-glow-hover: 0 2px 16px rgba(0, 122, 255, 0.4);
   --accent-glow-subtle: 0 1px 4px rgba(0, 0, 0, 0.15), 0 0 8px rgba(0, 122, 255, 0.2);
   --accent-focus-ring: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  --reading-bg: rgba(0, 122, 255, 0.12);
+  --reading-glow: 0 0 24px rgba(0, 122, 255, 0.06);
 
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
@@ -137,11 +141,8 @@
   --accent-glow-hover: 0 2px 16px rgba(10, 132, 255, 0.4);
   --accent-glow-subtle: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 8px rgba(10, 132, 255, 0.2);
   --accent-focus-ring: 0 0 0 3px rgba(10, 132, 255, 0.15);
-}
-
-[data-theme="dark"] [data-si].is-reading {
-  background: rgba(10, 132, 255, 0.2);
-  box-shadow: 0 0 20px rgba(10, 132, 255, 0.08);
+  --reading-bg: rgba(10, 132, 255, 0.2);
+  --reading-glow: 0 0 20px rgba(10, 132, 255, 0.08);
 }
 
 /* Focus styles */

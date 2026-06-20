@@ -10,7 +10,7 @@ body {
   font-size: var(--text-base);
   line-height: var(--line-height);
   color: var(--text-primary);
-  background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-primary) 60%, rgba(0, 122, 255, 0.02) 100%);
+  background: var(--bg-primary);
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;

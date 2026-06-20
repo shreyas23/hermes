@@ -55,7 +55,7 @@ async function open() {
   ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
-  designSelect.value = localStorage.getItem('hermes-design') || 'glass';
+  designSelect.value = settings.design || localStorage.getItem('hermes-design') || 'glass';
 
   if (edgeVoices) populateSelect(edgeVoiceSelect, edgeVoices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';

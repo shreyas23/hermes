@@ -1,3 +1,8 @@
+/* ===== Glass — body gradient ===== */
+[data-design="glass"] body {
+  background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-primary) 60%, rgba(0, 122, 255, 0.02) 100%);
+}
+
 /* ===== Soft Aurora — Light ===== */
 [data-design="aurora"] {
   --bg-primary: #faf8ff;
@@ -23,6 +28,9 @@
   --border: rgba(139, 92, 246, 0.06);
   --border-strong: rgba(139, 92, 246, 0.1);
 
+  --reading-bg: rgba(139, 92, 246, 0.12);
+  --reading-glow: 0 0 24px rgba(139, 92, 246, 0.06);
+
   --radius-md: 14px;
   --radius-lg: 20px;
 }
@@ -30,12 +38,6 @@
 /* Aurora body gradient */
 [data-design="aurora"] body {
   background: linear-gradient(135deg, #fef7f0 0%, #faf8ff 50%, #f0faf5 100%);
-}
-
-/* Aurora reading highlight */
-[data-design="aurora"] [data-si].is-reading {
-  background: rgba(139, 92, 246, 0.12);
-  box-shadow: 0 0 24px rgba(139, 92, 246, 0.06);
 }
 
 /* ===== Soft Aurora — Dark ===== */
@@ -66,6 +68,9 @@
   --border: rgba(167, 139, 250, 0.08);
   --border-strong: rgba(167, 139, 250, 0.12);
 
+  --reading-bg: rgba(167, 139, 250, 0.15);
+  --reading-glow: 0 0 20px rgba(167, 139, 250, 0.08);
+
   --toast-bg: rgba(35, 28, 48, 0.9);
   --toast-text: #e8e8e5;
 }
@@ -73,12 +78,6 @@
 /* Aurora dark body gradient */
 [data-design="aurora"][data-theme="dark"] body {
   background: linear-gradient(135deg, #1a1015 0%, #0d0a14 50%, #0a1410 100%);
-}
-
-/* Aurora dark reading highlight */
-[data-design="aurora"][data-theme="dark"] [data-si].is-reading {
-  background: rgba(167, 139, 250, 0.15);
-  box-shadow: 0 0 20px rgba(167, 139, 250, 0.08);
 }
 
 /* ===== Ink & Paper — Light ===== */
@@ -106,8 +105,8 @@
 
   --glass-bg: #f4f4f2;
   --glass-bg-heavy: #f7f7f5;
-  --glass-blur: blur(0px);
-  --glass-blur-heavy: blur(0px);
+  --glass-blur: none;
+  --glass-blur-heavy: none;
   --glass-border: rgba(0, 0, 0, 0.06);
   --glass-border-strong: rgba(0, 0, 0, 0.08);
   --glass-shadow: none;
@@ -125,6 +124,11 @@
   --radius-md: 6px;
   --radius-lg: 10px;
 
+  --reading-bg: rgba(44, 44, 42, 0.08);
+  --reading-glow: none;
+  --backdrop-blur: none;
+  --backdrop-blur-webkit: none;
+
   --toast-bg: rgba(44, 44, 42, 0.9);
   --toast-text: #fafaf8;
 }
@@ -132,19 +136,6 @@
 /* Ink body — flat, no gradient */
 [data-design="ink"] body {
   background: var(--bg-primary);
-}
-
-/* Ink reading highlight — no glow */
-[data-design="ink"] [data-si].is-reading {
-  background: rgba(44, 44, 42, 0.08);
-  box-shadow: none;
-}
-
-/* Ink modal backdrop — no blur */
-[data-design="ink"] .modal-backdrop {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  background: rgba(0, 0, 0, 0.15);
 }
 
 /* ===== Ink & Paper — Dark ===== */
@@ -173,8 +164,8 @@
 
   --glass-bg: #242320;
   --glass-bg-heavy: #282725;
-  --glass-blur: blur(0px);
-  --glass-blur-heavy: blur(0px);
+  --glass-blur: none;
+  --glass-blur-heavy: none;
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-border-strong: rgba(255, 255, 255, 0.08);
   --glass-shadow: none;
@@ -189,6 +180,11 @@
   --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-elevated: 0 1px 2px rgba(0, 0, 0, 0.2);
 
+  --reading-bg: rgba(232, 232, 229, 0.08);
+  --reading-glow: none;
+  --backdrop-blur: none;
+  --backdrop-blur-webkit: none;
+
   --toast-bg: rgba(232, 232, 229, 0.9);
   --toast-text: #1a1917;
 }
@@ -196,17 +192,4 @@
 /* Ink dark body */
 [data-design="ink"][data-theme="dark"] body {
   background: var(--bg-primary);
-}
-
-/* Ink dark reading highlight */
-[data-design="ink"][data-theme="dark"] [data-si].is-reading {
-  background: rgba(232, 232, 229, 0.08);
-  box-shadow: none;
-}
-
-/* Ink dark modal backdrop */
-[data-design="ink"][data-theme="dark"] .modal-backdrop {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  background: rgba(0, 0, 0, 0.3);
 }
