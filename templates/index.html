@@ -9,9 +9,12 @@
     const t = localStorage.getItem('hermes-theme')
       || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', t);
+    const d = localStorage.getItem('hermes-design') || 'glass';
+    document.documentElement.setAttribute('data-design', d);
   </script>
   <link rel="stylesheet" href="/static/css/layout.css">
   <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/designs.css">
 </head>
 <body>
   <div class="app" id="app">
@@ -167,6 +170,15 @@
     <div id="settings-backdrop" style="position:absolute;inset:0"></div>
     <div class="modal" role="dialog" aria-label="Settings" style="position:relative;z-index:1">
       <h2 class="modal__title">Settings</h2>
+
+      <div class="settings-group">
+        <label class="settings-label" for="setting-design">Design</label>
+        <select class="settings-select" id="setting-design">
+          <option value="glass">Glass</option>
+          <option value="aurora">Soft Aurora</option>
+          <option value="ink">Ink &amp; Paper</option>
+        </select>
+      </div>
 
       <div class="settings-group">
         <label class="settings-label" for="setting-engine">TTS Engine</label>

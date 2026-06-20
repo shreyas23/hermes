@@ -27,7 +27,11 @@ Text-to-podcast desktop app for macOS. Converts documents and articles into audi
 - `static/js/reader-highlight.js` — Reader view rendering, sentence highlighting, TOC panel
 - `static/js/player.js` — Audio playback, scrubber, progress saving
 - `static/js/sidebar.js` — Library sidebar, item list, navigation
+- `static/css/tokens.css` — Design tokens (colors, spacing, typography, glass tokens, accent glows)
+- `static/css/layout.css` — App shell layout (sidebar, main area)
 - `static/css/components.css` — Component styles (reader, controls, TOC, tables)
+- `static/css/designs.css` — Design variant overrides (Aurora, Ink & Paper); Glass is the default in tokens.css
+- `static/js/settings.js` — Settings modal logic, design/theme switching
 - `templates/index.html` — Main HTML layout
 
 ## Storage layout
@@ -75,9 +79,26 @@ Managed via `uv`. Key deps: flask, pywebview, pymupdf, pymupdf4llm, markdown, py
 
 Note: system pip/pip3 have a broken expat library on this machine — always use `uv` for dependency management.
 
+## Design system
+
+The UI supports multiple visual designs, switchable via Settings > Design. The system is token-based — component CSS references design tokens (`--glass-bg`, `--accent-glow`, `--glass-blur`, etc.) and never contains design-specific values.
+
+**Current designs:**
+- `glass` (default) — frosted translucency, backdrop-blur, Apple blue accent
+- `aurora` — lavender accent, warm-to-cool gradient body, tinted glass, rounder corners
+- `ink` — monochromatic (accent = text color), opaque surfaces, no blur/glow, minimal shadows
+
+**How it works:** Each design is a `[data-design="..."]` CSS selector block in `designs.css` that overrides tokens from `tokens.css`. Glass is the implicit default (its tokens live in `tokens.css` directly). Light/dark variants use `[data-design="..."][data-theme="dark"]` selectors. The `data-design` attribute is set on `<html>`, initialized from localStorage in the `<head>` script, and persisted to both localStorage and SQLite on change.
+
+**Adding a new design:**
+1. Add a token override block to `static/css/designs.css` (light + dark variants)
+2. Add an `<option>` to the `#setting-design` select in `templates/index.html`
+3. Key tokens to override: `--accent`, `--glass-bg`, `--glass-blur` (set to `blur(0px)` for opaque), `--glass-border`, `--glass-shadow`, `--accent-glow` (set to `none` to disable), `--radius-md`/`--radius-lg`, `--shadow-*`, plus body background and reading highlight via element selectors
+
 ## Settings
 
 Stored in SQLite `settings` table. Key settings:
+- `design` — `glass` (default), `aurora`, or `ink`
 - `tts_engine` — `edge` (default) or `say`
 - `edge_voice` / `say_voice` — voice selection per engine
 - `pdf_tables` — `off` (default) disables HTML table rendering in PDFs; set to `on` to enable (tables are often broken by pymupdf4llm's cell-splitting)
