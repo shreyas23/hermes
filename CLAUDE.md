@@ -118,34 +118,63 @@ Stored in SQLite `settings` table. Key settings:
 
 ## Future development
 
-**Passive listening & workflow:**
+Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
+
+**1. Complete the core loop** — make listen-while-working actually work hands-free
 - **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click, auto-advance
 - **Global media key support** — macOS media keys (play/pause, skip) control Hermes without switching windows
-- **Mini player mode** — compact floating strip (title + play/pause + progress) over other apps
 - **Sleep timer** — auto-pause after N minutes
 
-**Information aggregation:**
-- **RSS feed subscriptions** — subscribe to feeds, auto-import new articles
-- **Live news feeds** — aggregate news sources into the listening queue
-- **Outlook email integration** — import and listen to emails and newsletters
-- **Daily briefing** — auto-queue unread items by priority each morning
+**2. Reduce import friction** — remove the biggest UX papercut for getting content in
+- **Drag-and-drop import** — drop files onto the window to import
+- **Watch folders** — auto-import new files from designated directories
 
-**Document intelligence:**
-- **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
-- **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
+**3. In-session comprehension** — make the teleprompter useful beyond passive listening
 - **Search within transcript** — find text in the current item's teleprompter view
-
-**Comprehension & curation:**
 - **Bookmarks & annotations** — mark and annotate passages while listening
 - **Export highlights** — export annotated passages
+
+**4. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
+- **Alternative TTS engines** — Edge TTS or OpenAI TTS for higher-quality voices
+
+**5. Content expansion** — only after the core experience is solid
+- **RSS feed subscriptions** — subscribe to feeds, auto-import new articles
+- **Live news feeds** — aggregate news sources into the listening queue
+- **Daily briefing** — auto-queue unread items by priority each morning (depends on play queue)
+
+**6. Polish & export**
+- **Mini player mode** — compact floating strip (title + play/pause + progress) over other apps
+- **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
+- **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Auto-tagging** — tag items by topic automatically
 - **Smart collections** — dynamic collections based on filters/rules
-
-**Audio & export:**
-- **Alternative TTS engines** — Edge TTS or OpenAI TTS for higher-quality voices
 - **Speed-specific audio caching** — pre-generate audio at different speeds (currently speed is applied via playbackRate which changes pitch slightly)
 - **Export as podcast MP3** — export library items as MP3 files with metadata
 
-**Import & UI:**
-- **Drag-and-drop import** — drop files onto the window to import
-- **Watch folders** — auto-import new files from designated directories
+## Testing
+
+Playwright E2E tests run against the Flask server on port 5199 (no PyWebView). Scripts live in `e2e/`.
+
+### Running
+
+```
+npm run e2e
+```
+
+### Rules
+
+- **Screenshot after every UI change.** Before reporting a visual change as done, run `node e2e/screenshot.mjs` and read the screenshots. Don't ship layout you haven't seen.
+- **Flask server on port 5199.** Tests start their own server using `/opt/homebrew/bin/uv run python -c "..."` — never connect to the user's running app on 5123.
+- **Use `domcontentloaded`, not `networkidle`.** The SSE endpoint keeps connections open — `networkidle` will timeout.
+- **Screenshots go in `e2e/screenshots/`.** This directory is gitignored. Name files with numbered prefixes: `01-empty.png`, `02-item-open.png`, etc.
+- **Skip interrupted items.** The first item in the library may have no audio. Check `audio_ready` state or look for the interrupted badge before trying to click play.
+
+### What to test
+
+**UX / visual regression:** screenshot each app state (empty, item open, playing, browsing while playing) and compare before/after. Check all three designs (glass, aurora, ink) and both themes (light, dark) when touching CSS.
+
+**Frontend:** verify controls show/hide correctly, scrubber updates during playback, sentence highlighting syncs, keyboard shortcuts work, imports complete and appear in sidebar.
+
+**Backend:** use `curl` or `fetch()` against the API endpoints (`/api/library`, `/api/library/<id>`, `/api/import/*`, `/api/library/<id>/progress`) to verify responses. Check that audio files exist after import completes.
+
+**Bugs / regression:** write a targeted Playwright script in `e2e/` that reproduces the bug scenario, verify the fix, keep the script if the scenario is worth protecting.
