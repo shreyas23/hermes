@@ -1,6 +1,19 @@
 # Hermes
 
-Text-to-podcast desktop app for macOS. Converts documents and articles into audio with a teleprompter UI, library management, and podcast-style playback controls.
+Private, local-first information hub for macOS. Converts documents, articles, and live news feeds into audio you can absorb while working — with a teleprompter UI, smart library management, and podcast-style playback controls.
+
+## Product vision
+
+Hermes is a **productive information hub**, not just a document reader. The goal is to be the best way to passively absorb information while working — privacy-first, desktop-native, and structure-aware.
+
+**Differentiators vs cloud listeners (ElevenReader, etc.):**
+- **Privacy** — fully local, no cloud, no subscriptions, no data leaves the machine. Safe for sensitive/work/legal/medical documents.
+- **Document intelligence** — structured extraction (TOC, headings, chapters), not flat text. Skip sections, navigate by chapter.
+- **Desktop workflow integration** — global media keys, menu bar presence, watch folders. Lives where knowledge workers already are.
+- **Active reading hybrid** — teleprompter syncs reading with listening for comprehension. Annotate, bookmark, export highlights.
+- **Information aggregation** — RSS feeds, news sources, and article subscriptions feed into a single listening queue.
+- **Outlook email integration** — read emails and newsletters as audio (planned).
+- **Smart curation** — collections, auto-tagging, daily briefings, priority queuing.
 
 ## Git conventions
 
@@ -105,13 +118,34 @@ Stored in SQLite `settings` table. Key settings:
 
 ## Future development
 
+**Passive listening & workflow:**
+- **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click, auto-advance
+- **Global media key support** — macOS media keys (play/pause, skip) control Hermes without switching windows
+- **Mini player mode** — compact floating strip (title + play/pause + progress) over other apps
+- **Sleep timer** — auto-pause after N minutes
+
+**Information aggregation:**
+- **RSS feed subscriptions** — subscribe to feeds, auto-import new articles
+- **Live news feeds** — aggregate news sources into the listening queue
+- **Outlook email integration** — import and listen to emails and newsletters
+- **Daily briefing** — auto-queue unread items by priority each morning
+
+**Document intelligence:**
 - **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
-- **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click
-- **Sleep timer** — auto-pause after N minutes
 - **Search within transcript** — find text in the current item's teleprompter view
-- **RSS feed subscriptions** — subscribe to feeds, auto-import new articles
+
+**Comprehension & curation:**
+- **Bookmarks & annotations** — mark and annotate passages while listening
+- **Export highlights** — export annotated passages
+- **Auto-tagging** — tag items by topic automatically
+- **Smart collections** — dynamic collections based on filters/rules
+
+**Audio & export:**
 - **Alternative TTS engines** — Edge TTS or OpenAI TTS for higher-quality voices
 - **Speed-specific audio caching** — pre-generate audio at different speeds (currently speed is applied via playbackRate which changes pitch slightly)
-- **Drag-and-drop import** — drop files onto the window to import
 - **Export as podcast MP3** — export library items as MP3 files with metadata
+
+**Import & UI:**
+- **Drag-and-drop import** — drop files onto the window to import
+- **Watch folders** — auto-import new files from designated directories

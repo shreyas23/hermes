@@ -1,230 +1,125 @@
 <img width="1097" height="768" alt="hermes" src="https://github.com/user-attachments/assets/2d3c9f9d-8914-4739-8481-a4db8d68504a" />
 
 # Hermes
-Turn any document or article into an audiobook. Hermes is a macOS desktop app that converts text into speech with a teleprompter-style reading view, a full library system, and podcast-grade playback controls.
 
-Paste a URL, drop in a PDF, or import a folder of documents — Hermes extracts the text, generates audio using macOS text-to-speech, and gives you a native app experience with scrubbing, speed control, and progress tracking.
+Local macOS app that converts documents, articles, and feeds into audio. Runs entirely on-device — no accounts, no cloud, no subscriptions.
 
-## Features
-
-- **Multi-format support** — PDF, DOCX, Markdown, HTML, RTF, plain text
-- **Article import** — paste any URL to extract and listen to web articles
-- **Teleprompter view** — highlighted sentence tracking synced to audio playback
-- **Native scrubbing** — cached audio with smooth, sample-accurate seeking
-- **Speed control** — 0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x playback
-- **Library management** — organize content with auto-categorization and custom collections
-- **Progress tracking** — resume exactly where you left off, auto-saves every 30 seconds
-- **Mini player** — persistent playback bar while browsing your library
-- **Keyboard shortcuts** — Space (play/pause), arrows (skip sentences), Escape (stop)
-- **Offline** — all processing happens locally, no API keys or accounts needed
-
-## Requirements
-
-- **macOS** (uses native `say` TTS and WebKit via PyWebView)
-- **Python 3.12+**
-- **[uv](https://docs.astral.sh/uv/)** — Python package manager
+**Supports:** PDF, DOCX, Markdown, HTML, RTF, plain text, web URLs
 
 ## Quick start
 
-```bash
-# Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
+Requires macOS, Python 3.12+, and [uv](https://docs.astral.sh/uv/).
 
-# Clone and run
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/shreyas23/hermes.git
 cd hermes
 uv run python app.py
 ```
 
-A native window opens. Click **+** to import your first article or document.
+## Features
 
-## Usage
+- Sentence-synced teleprompter view with click-to-jump
+- Cached WAV audio with native seeking (no streaming buffer)
+- 0.5x–2x playback speed
+- Auto-resuming progress, saves every 30s
+- Library with auto-categorization, collections, sidebar navigation
+- PDF structure extraction: TOC, headings, chapter navigation
+- SSE-based real-time generation progress
 
-### Importing content
+## Controls
 
-Click the **+** button in the top-right corner of the sidebar to open the import dialog:
-
-| Method | Description |
-|--------|-------------|
-| **URL** | Paste an article URL — text is extracted automatically |
-| **File** | Enter a path to a local file (PDF, DOCX, MD, TXT, HTML, RTF) |
-| **Folder** | Scan a folder and import files individually |
-| **Text** | Paste raw text with a title |
-
-After importing, audio generation begins in the background. A progress bar shows the status — you can cancel at any time.
-
-### Playback controls
-
-| Control | Action |
-|---------|--------|
+| Key | Action |
+|-----|--------|
 | `Space` | Play / Pause |
-| `Left Arrow` | Previous sentence |
-| `Right Arrow` | Next sentence |
-| `-15` / `+15` | Skip back / forward 15 seconds |
-| Speed button | Cycle through playback speeds |
-| Scrubber | Drag to seek to any position |
-| `Escape` | Stop playback |
+| `Left` / `Right` | Previous / next sentence |
+| `-15` / `+15` | Skip 15 seconds |
+| `Escape` | Stop |
 
-Click any sentence in the teleprompter to jump directly to it.
+## Import methods
 
-### Library
+| Method | Input |
+|--------|-------|
+| URL | Article URL — text extracted via trafilatura |
+| File | Local file path |
+| Folder | Batch import all supported files |
+| Text | Raw text with title |
 
-Content is auto-organized by source type (Articles, Documents, Text) and you can create custom collections. The sidebar shows:
+Audio generates in background at ~4x realtime.
 
-- **Recent** — latest imports
-- **In Progress** — items you've started listening to
-- **Sources** — Articles, Documents, Text
-- **Collections** — user-created groups
+## Roadmap
 
-## Architecture
+**Passive listening:** play queue with auto-advance, global media keys, floating mini player, sleep timer
 
-```
-┌─────────────────────────────────────────────┐
-│              PyWebView (WebKit)             │
-│  ┌────────┐  ┌────────────────────────────┐ │
-│  │Sidebar │  │     Teleprompter View      │ │
-│  │Library │  │  sentence-synced scrolling  │ │
-│  │Nav     │  │                            │ │
-│  └────────┘  └────────────────────────────┘ │
-│  ┌────────────────────────────────────────┐  │
-│  │  Controls: ◀◀ ▶ ⏸ ▶▶ ──●──── 2:35    │  │
-│  └────────────────────────────────────────┘  │
-├─────────────────────────────────────────────┤
-│                Flask (port 5123)             │
-│  Routes: /api/library, /api/import, SSE     │
-├─────────────────────────────────────────────┤
-│  extractors.py │ audio.py    │ models.py    │
-│  PDF/DOCX/HTML │ say → WAV   │ SQLite       │
-│  MD/RTF/TXT    │ concat/cache│ library.db   │
-└─────────────────────────────────────────────┘
-```
+**Feeds:** RSS subscriptions, news aggregation, Outlook email integration, auto-queued morning briefing
 
-### Key files
+**Documents:** chapter/section selection, inline images, transcript search, better PDF tables
 
-| File | Purpose |
-|------|---------|
-| `app.py` | Flask routes, SSE, PyWebView entry point |
-| `models.py` | SQLite schema and queries (items, progress, collections) |
-| `audio.py` | TTS generation, WAV concatenation, caching, cancellation |
-| `extractors.py` | Text extraction per format (pymupdf, python-docx, bs4, striprtf) |
-| `static/app.js` | Frontend: library UI, teleprompter, audio playlist, controls |
-| `static/style.css` | Dark theme styling |
-| `templates/index.html` | HTML layout |
+**Curation:** bookmarks, annotations, highlight export, auto-tagging, filtered collections
 
-### How audio generation works
+**Audio:** Edge TTS / OpenAI TTS voices, speed-specific caching, MP3 export
 
-1. Text is split into sentences using [pysbd](https://github.com/nipunsadvilkar/pysbd)
-2. Each sentence is rendered to a WAV file via macOS `say -o`
-3. Individual WAVs are concatenated into a single `master.wav` per item
-4. Sentence timestamps are recorded for teleprompter sync
-5. The master WAV is cached — subsequent plays load instantly with native seeking
+**Import:** drag-and-drop, watch folders
 
-Audio is generated at ~4x real-time (a 5-minute article takes ~75 seconds).
-
-### Data storage
-
-All user data lives in `~/hermes-library/`:
-
-```
-~/hermes-library/
-├── library.db              # SQLite: metadata, text, timelines, progress
-└── audio/
-    └── <item_id>/
-        └── master.wav      # Cached audio (22050Hz, mono, 16-bit PCM)
-```
-
-- **~150MB of disk per hour of audio content**
-- Original files are not copied — only extracted text is stored
-- Deleting an item removes its audio cache automatically
+---
 
 ## Development
 
-### Setup
-
 ```bash
-git clone https://github.com/shreyas23/hermes.git
-cd hermes
-uv sync
-```
-
-### Running in development
-
-```bash
+git clone https://github.com/shreyas23/hermes.git && cd hermes && uv sync
 uv run python app.py
 ```
 
-The Flask server starts on `http://127.0.0.1:5123` and a PyWebView window opens pointing to it. You can also open `http://127.0.0.1:5123` in a browser for debugging.
+Flask on `:5123`, PyWebView opens a native WebKit window. Hit `127.0.0.1:5123` in a browser for debugging.
 
-### Project structure
+### Architecture
 
 ```
-hermes/
-├── app.py              # Flask app + PyWebView launcher
-├── audio.py            # TTS generation and audio caching
-├── extractors.py       # Text extraction (PDF, DOCX, HTML, etc.)
-├── models.py           # SQLite database layer
-├── static/
-│   ├── app.js          # Frontend application logic
-│   └── style.css       # Styling
-├── templates/
-│   └── index.html      # HTML layout
-├── pyproject.toml      # Dependencies and project config
-├── uv.lock             # Locked dependency versions
-├── CLAUDE.md           # Internal dev notes
-└── README.md
+PyWebView (WebKit)
+├── Sidebar (library, nav, collections)
+├── Teleprompter (sentence-synced scrolling)
+└── Controls (scrubber, speed, skip)
+
+Flask (port 5123)
+├── /api/library, /api/import
+├── SSE for generation progress
+├── extractors.py — PDF/DOCX/HTML/MD/RTF/TXT
+├── audio.py — say → WAV → concat → cache
+└── models.py — SQLite (library.db)
 ```
+
+### Audio pipeline
+
+1. Sentence split via [pysbd](https://github.com/nipunsadvilkar/pysbd)
+2. Per-sentence WAV via macOS `say -o`
+3. Concatenate into `master.wav`
+4. Record sentence→timestamp mapping for teleprompter sync
+5. Cache — subsequent plays are instant with native seeking
+
+### Data
+
+```
+~/hermes-library/
+├── library.db          # SQLite: metadata, text, timelines, progress
+└── audio/<item_id>/
+    └── master.wav      # 22050Hz mono 16-bit PCM (~150MB/hr)
+```
+
+Original files are not copied. Only extracted text is stored.
 
 ### Dependencies
 
-Managed with [uv](https://docs.astral.sh/uv/). All dependencies are declared in `pyproject.toml`:
+[uv](https://docs.astral.sh/uv/) managed. Key packages: flask, pywebview, pymupdf, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura.
 
-| Package | Purpose |
-|---------|---------|
-| flask | HTTP backend and API |
-| pywebview | Native macOS window (WebKit) |
-| pymupdf | PDF text extraction |
-| python-docx | DOCX text extraction |
-| beautifulsoup4 | HTML text extraction |
-| striprtf | RTF text extraction |
-| pysbd | Sentence boundary detection |
-| trafilatura | Web article extraction |
+### Extending
 
-### Adding a new file format
+**New format:** Add extension to `SUPPORTED_EXTENSIONS` in `extractors.py`, implement `_extract_<format>()`, add to dispatch table.
 
-1. Add the extension to `SUPPORTED_EXTENSIONS` in `extractors.py`
-2. Write an `_extract_<format>(path: str) -> str` function
-3. Add it to the dispatch table in `extract_text()`
-
-### Adding a new TTS engine
-
-The TTS layer is in `audio.py`. Replace the `subprocess.run(['say', ...])` call in `generate_audio_for_item()` with your engine. The contract: produce a WAV file at the given path for the given text. Everything downstream (concatenation, caching, timeline) works unchanged.
+**New TTS engine:** Replace `subprocess.run(['say', ...])` in `audio.py`. Contract: produce WAV at given path for given text. Concat, cache, and timeline work unchanged.
 
 ## Contributing
 
-Contributions are welcome. Please:
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Make your changes
-4. Test locally — run the app and verify your change works end-to-end
-5. Commit with a clear message
-6. Open a pull request
-
-### Guidelines
-
-- Keep dependencies minimal — this is a lightweight local app
-- Frontend is vanilla JS — no build step, no framework
-- Test with real documents (PDFs with complex layouts, long articles, edge cases)
-- macOS-only features are fine — this app is inherently macOS-native
-
-### Planned features
-
-See the [Future development](CLAUDE.md#future-development) section in CLAUDE.md for the roadmap. Good first issues:
-
-- **Sleep timer** — auto-pause after N minutes
-- **Search within transcript** — find text in the teleprompter view
-- **Drag-and-drop import** — drop files onto the window
-- **Export as MP3** — export items with metadata
+Fork, branch, test with real documents, open a PR. Vanilla JS frontend, no build step.
 
 ## License
 
