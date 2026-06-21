@@ -6,7 +6,7 @@ import wave
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from models import item_audio_dir, item_master_wav, item_master_m4a, update_item_audio, delete_item
+from models import item_audio_dir, item_master_wav, item_master_m4a, update_item_audio, delete_item, close_db
 
 TTS_WORKERS = 4
 EDGE_TTS_VOICE = 'en-US-AriaNeural'
@@ -78,6 +78,8 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
             async def gen(i, text):
                 nonlocal completed
                 async with sem:
+                    if cancel_event.is_set():
+                        return
                     idx, dur = await _generate_sentence_wav_edge(i, text, audio_dir, cancel_event, voice)
                     durations[idx] = dur
                     with progress_lock:
@@ -111,10 +113,16 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
     wav_path = item_master_wav(item_id)
     _concatenate_wavs(audio_dir, len(sentences), wav_path)
 
+    if not os.path.isfile(wav_path):
+        return None, 0
+
     m4a_path = item_master_m4a(item_id)
-    _convert_to_m4a(wav_path, m4a_path)
-    if os.path.isfile(m4a_path) and os.path.getsize(m4a_path) > 0:
-        os.unlink(wav_path)
+    try:
+        _convert_to_m4a(wav_path, m4a_path)
+        if os.path.isfile(m4a_path) and os.path.getsize(m4a_path) > 0:
+            os.unlink(wav_path)
+    except Exception as e:
+        print(f"M4A conversion failed, keeping WAV: {e}")
 
     timestamps = []
     cumulative_ms = 0
@@ -149,10 +157,15 @@ def generate_audio_background(item_id, sentences, on_progress=None, on_complete=
                     on_cancel(item_id)
             elif on_complete:
                 on_complete(item_id, timeline, total_ms)
+        except Exception as e:
+            print(f"Audio generation failed for item {item_id}: {e}")
+            if on_cancel:
+                on_cancel(item_id)
         finally:
             with _jobs_lock:
                 if _active_jobs.get(item_id) is cancel_event:
                     del _active_jobs[item_id]
+            close_db()
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
@@ -182,9 +195,10 @@ def is_generating(item_id):
 
 def _cleanup_partial(audio_dir, count):
     for i in range(count):
-        path = os.path.join(audio_dir, f'sent_{i:04d}.wav')
-        if os.path.exists(path):
-            os.unlink(path)
+        for ext in ('.wav', '.mp3'):
+            path = os.path.join(audio_dir, f'sent_{i:04d}{ext}')
+            if os.path.exists(path):
+                os.unlink(path)
     for name in ('master.wav', 'master.m4a'):
         path = os.path.join(audio_dir, name)
         if os.path.exists(path):
@@ -217,6 +231,8 @@ def _concatenate_wavs(audio_dir, count, output_path):
                     out.setparams(inp.getparams())
                     params_set = True
                 out.writeframes(inp.readframes(inp.getnframes()))
+    if not params_set:
+        os.unlink(output_path)
 
 
 def _wav_duration_ms(path):

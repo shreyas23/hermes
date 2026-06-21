@@ -236,8 +236,8 @@ def import_url():
             raw_bytes = resp.read(MAX_DOWNLOAD + 1)
             if len(raw_bytes) > MAX_DOWNLOAD:
                 return jsonify({'error': 'File too large (max 50MB)'}), 400
-    except Exception as e:
-        return jsonify({'error': f'Could not download page: {e}'}), 400
+    except Exception:
+        return jsonify({'error': 'Could not download page'}), 400
     if not raw_bytes:
         return jsonify({'error': 'Could not download page'}), 400
 
@@ -296,9 +296,10 @@ def import_url():
         finally:
             os.unlink(tmp_path)
 
-    import cgi
-    _, params = cgi.parse_header(content_type)
-    charset = params.get('charset', 'utf-8')
+    from email.message import Message
+    msg = Message()
+    msg['content-type'] = content_type
+    charset = msg.get_param('charset', 'utf-8')
     try:
         downloaded = raw_bytes.decode(charset)
     except (UnicodeDecodeError, LookupError):
@@ -364,6 +365,8 @@ def import_folder():
     for f in sorted(Path(folder).iterdir()):
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
             files.append({'name': f.name, 'path': str(f), 'ext': f.suffix.lower()})
+            if len(files) >= 500:
+                break
 
     return jsonify({'folder': folder, 'files': files})
 

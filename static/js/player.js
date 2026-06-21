@@ -113,7 +113,19 @@ export function initPlayer() {
     }
   });
 
-  window.addEventListener('beforeunload', saveProgress);
+  window.addEventListener('beforeunload', () => {
+    const itemId = state.playingItemId;
+    const src = state.audio.src;
+    if (!itemId || !src) return;
+    const currentSentence = getCurrentSentenceIndex();
+    const currentTimeMs = state.audio.currentTime * 1000;
+    const body = JSON.stringify({
+      current_sentence: currentSentence,
+      current_time_ms: currentTimeMs,
+      is_finished: false,
+    });
+    navigator.sendBeacon(`/api/library/${itemId}/progress`, new Blob([body], { type: 'application/json' }));
+  });
 }
 
 export function loadAudio(item) {
