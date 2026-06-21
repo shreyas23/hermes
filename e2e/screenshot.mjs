@@ -35,28 +35,31 @@ try {
   await page.screenshot({ path: `${DIR}/01-empty.png` });
   console.log('01-empty.png — empty state');
 
-  const firstItem = page.locator('.item').first();
-  if (await firstItem.count() > 0) {
-    await firstItem.click();
+  // Audio is opt-in: pending items have no player. Pick items that already have
+  // audio (audio-ready items carry no status badge in the sidebar).
+  const readyItems = page.locator('.item:not(:has(.badge))');
+  if (await readyItems.count() > 0) {
+    await readyItems.first().click();
     await sleep(500);
     await page.screenshot({ path: `${DIR}/02-item-open.png` });
     console.log('02-item-open.png — item open');
 
-    const playBtn = page.locator('#btn-play:not(.is-hidden)');
-    if (await playBtn.count() > 0) {
+    const playBtn = page.locator('#btn-play');
+    if (await playBtn.isVisible()) {
       await playBtn.click();
       await sleep(1000);
       await page.screenshot({ path: `${DIR}/03-playing.png` });
       console.log('03-playing.png — playing');
 
-      const secondItem = page.locator('.item').nth(1);
-      if (await secondItem.count() > 0) {
-        await secondItem.click();
+      if (await readyItems.count() > 1) {
+        await readyItems.nth(1).click();
         await sleep(500);
         await page.screenshot({ path: `${DIR}/04-remote-playing.png` });
         console.log('04-remote-playing.png — viewing different item while playing');
       }
     }
+  } else {
+    console.log('No audio-ready items — skipping player screenshots (opt-in audio)');
   }
 
   console.log(`\nDone — screenshots in ${DIR}/`);
