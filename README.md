@@ -49,17 +49,17 @@ Audio generates in background at ~4x realtime.
 
 ## Roadmap
 
-**Passive listening:** play queue with auto-advance, global media keys, floating mini player, sleep timer
+**1. Core loop:** play queue with auto-advance, global media keys, sleep timer
 
-**Feeds:** RSS subscriptions, news aggregation, Outlook email integration, auto-queued morning briefing
+**2. Import friction:** drag-and-drop, watch folders
 
-**Documents:** chapter/section selection, inline images, transcript search, better PDF tables
+**3. Comprehension:** transcript search, bookmarks, annotations, highlight export
 
-**Curation:** bookmarks, annotations, highlight export, auto-tagging, filtered collections
+**4. Audio quality:** Edge TTS / OpenAI TTS voices
 
-**Audio:** Edge TTS / OpenAI TTS voices, speed-specific caching, MP3 export
+**5. Content expansion:** RSS subscriptions, news aggregation, daily briefing
 
-**Import:** drag-and-drop, watch folders
+**6. Polish & export:** mini player, inline images, better PDF tables, auto-tagging, filtered collections, speed-specific caching, MP3 export
 
 ---
 
