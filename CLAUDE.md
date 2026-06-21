@@ -167,7 +167,7 @@ npm run e2e
 - **Flask server on port 5199.** Tests start their own server using `/opt/homebrew/bin/uv run python -c "..."` — never connect to the user's running app on 5123.
 - **Use `domcontentloaded`, not `networkidle`.** The SSE endpoint keeps connections open — `networkidle` will timeout.
 - **Screenshots go in `e2e/screenshots/`.** This directory is gitignored. Name files with numbered prefixes: `01-empty.png`, `02-item-open.png`, etc.
-- **Skip interrupted items.** The first item in the library may have no audio. Check `audio_ready` state or look for the interrupted badge before trying to click play.
+- **Audio is opt-in — pick audio-ready items for playback tests.** Imports no longer auto-generate audio; new items are `pending` (sidebar shows a status badge, the reader shows a Generate-audio bar, transport controls are hidden). To test playback, select an item with audio (`.item:not(:has(.badge))`) or generate audio first. Use an isolated temp library (override `models.DB_PATH`/`AUDIO_DIR`/`IMAGES_DIR` before `from app import app`) for feature tests so the real library is untouched.
 
 ### What to test
 
