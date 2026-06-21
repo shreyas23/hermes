@@ -64,11 +64,13 @@ export function initPlayer() {
     syncButtons();
     stopTick();
     stopProgressSave();
-    if (state.currentItemId) {
-      api(`/api/library/${state.currentItemId}/progress`, {
+    if (state.playingItemId) {
+      api(`/api/library/${state.playingItemId}/progress`, {
         body: { current_sentence: state.timeline.length, current_time_ms: 0, is_finished: true }
       });
     }
+    state.playingItemId = null;
+    state.playingItem = null;
     updateMiniPlayer();
   });
 
@@ -105,7 +107,19 @@ export function initPlayer() {
   scrubber.addEventListener('change', finishScrub);
 
   // Mini player
-  miniPlay.addEventListener('click', (e) => { e.stopPropagation(); play(); });
+  miniPlay.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (state.playingItemId) {
+      state.audio.play();
+      state.playing = true;
+      syncButtons();
+      startTick();
+      startProgressSave();
+      updateMiniPlayer();
+    } else {
+      play();
+    }
+  });
   miniPause.addEventListener('click', (e) => { e.stopPropagation(); pause(); });
 
   // Keyboard
@@ -132,6 +146,8 @@ export function loadAudio(item) {
   timeCurrent.textContent = '0:00';
   scrubber.value = 0;
   statusText.textContent = item.title;
+  state.playingItemId = item.id;
+  state.playingItem = item;
   state.audio.src = `/api/library/${item.id}/audio`;
   state.audio.playbackRate = SPEED_OPTIONS[state.speedIndex];
   state.audio.load();
@@ -150,6 +166,14 @@ export function loadAudio(item) {
 
 export function play() {
   if (!state.currentItem || !state.currentItem.audio_ready) return;
+
+  if (state.currentItemId !== state.playingItemId) {
+    if (state.playingItemId) saveProgress();
+    state.timeline = state.currentItem.timeline || [];
+    state.totalDurationMs = state.currentItem.total_duration_ms;
+    loadAudio(state.currentItem);
+  }
+
   state.audio.play();
   state.playing = true;
   syncButtons();
@@ -177,19 +201,41 @@ export function stop() {
   stopProgressSave();
   scrubber.value = 0;
   timeCurrent.textContent = '0:00';
+  state.playingItemId = null;
+  state.playingItem = null;
   clearHighlights();
 }
 
 export function seekToSentence(index) {
-  if (!state.timeline[index]) return;
-  state.audio.currentTime = state.timeline[index].start_ms / 1000;
-  if (!state.playing) {
-    state.audio.play();
-    state.playing = true;
-    syncButtons();
-    startTick();
+  const switching = state.currentItemId !== state.playingItemId;
+  if (switching) {
+    if (state.playingItemId) saveProgress();
+    state.timeline = state.currentItem.timeline || [];
+    state.totalDurationMs = state.currentItem.total_duration_ms;
+    loadAudio(state.currentItem);
   }
-  highlightCurrentSentence();
+  if (!state.timeline[index]) return;
+
+  const seekSec = state.timeline[index].start_ms / 1000;
+  const startPlay = () => {
+    state.audio.currentTime = seekSec;
+    if (!state.playing) {
+      state.audio.play();
+      state.playing = true;
+      syncButtons();
+      startTick();
+      startProgressSave();
+    }
+    highlightCurrentSentence();
+  };
+
+  if (switching) {
+    if (canplayAbort) canplayAbort.abort();
+    canplayAbort = new AbortController();
+    state.audio.addEventListener('canplay', startPlay, { once: true, signal: canplayAbort.signal });
+  } else {
+    startPlay();
+  }
 }
 
 function syncButtons() {
@@ -205,9 +251,11 @@ function startTick() {
     if (state.playing && !state.audio.paused && !state.scrubbing) {
       const currentMs = state.audio.currentTime * 1000;
       const total = state.totalDurationMs || 1;
-      scrubber.value = Math.round((currentMs / total) * 10000);
-      timeCurrent.textContent = formatTime(currentMs);
-      highlightCurrentSentence();
+      if (state.currentItemId === state.playingItemId) {
+        scrubber.value = Math.round((currentMs / total) * 10000);
+        timeCurrent.textContent = formatTime(currentMs);
+        highlightCurrentSentence();
+      }
       updateMiniPlayer();
     }
   }, 100);
@@ -221,7 +269,7 @@ function stopTick() {
 }
 
 export function saveProgress() {
-  const itemId = state.currentItemId;
+  const itemId = state.playingItemId;
   const src = state.audio.src;
   if (!itemId || !src) return;
   const currentSentence = getCurrentSentenceIndex();
@@ -247,17 +295,30 @@ function stopProgressSave() {
   }
 }
 
-function updateMiniPlayer() {
-  if (!state.currentItem) {
+export function updateMiniPlayer() {
+  const loaded = state.playingItemId && state.audio.src;
+  const show = loaded && state.playingItemId !== state.currentItemId;
+
+  if (!show) {
     miniPlayer.classList.remove('is-visible');
     document.querySelector('.app').classList.remove('has-mini-player');
     return;
   }
+
   miniPlayer.classList.add('is-visible');
   document.querySelector('.app').classList.add('has-mini-player');
-  miniTitle.textContent = state.currentItem.title;
+  miniTitle.textContent = state.playingItem.title;
   const currentMs = state.audio.currentTime * 1000;
-  const total = state.totalDurationMs || 1;
+  const total = (state.playingItem.total_duration_ms) || 1;
   miniTime.textContent = `${formatTime(currentMs)} / ${formatTime(total)}`;
   miniProgressFill.style.width = `${(currentMs / total) * 100}%`;
+}
+
+export function prepareControls(item) {
+  timeTotal.textContent = formatTime(item.total_duration_ms);
+  statusText.textContent = item.title;
+  const resumeMs = item.progress && !item.progress.is_finished ? item.progress.current_time_ms : 0;
+  const total = item.total_duration_ms || 1;
+  scrubber.value = Math.round((resumeMs / total) * 10000);
+  timeCurrent.textContent = formatTime(resumeMs);
 }
