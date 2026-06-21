@@ -409,7 +409,7 @@ def settings_get():
     return jsonify(get_all_settings())
 
 
-_ALLOWED_SETTINGS = {'tts_engine', 'edge_voice', 'say_voice', 'theme'}
+_ALLOWED_SETTINGS = {'tts_engine', 'edge_voice', 'say_voice', 'theme', 'design'}
 
 @app.route('/api/settings', methods=['POST'])
 def settings_update():

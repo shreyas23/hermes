@@ -29,6 +29,7 @@ export function initSettings() {
   designSelect.addEventListener('change', () => {
     document.documentElement.setAttribute('data-design', designSelect.value);
     localStorage.setItem('hermes-design', designSelect.value);
+    api('/api/settings', { body: { design: designSelect.value } });
   });
 
   updateThemeIcon();
