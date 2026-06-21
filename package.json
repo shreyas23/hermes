@@ -1,0 +1,16 @@
+{
+  "name": "hermes",
+  "private": true,
+  "description": "E2E testing utilities for Hermes",
+  "scripts": {
+    "e2e": "node e2e/screenshot.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shreyas23/hermes.git"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.61.0"
+  }
+}

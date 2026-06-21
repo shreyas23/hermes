@@ -22,3 +22,5 @@ wheels/
 
 # Claude
 .claude/
+e2e/screenshots/
+node_modules/
