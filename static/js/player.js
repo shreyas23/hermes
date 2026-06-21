@@ -14,12 +14,6 @@ const scrubber = document.getElementById('scrubber');
 const timeCurrent = document.getElementById('time-current');
 const timeTotal = document.getElementById('time-total');
 const statusText = document.getElementById('status-text');
-const miniPlayer = document.getElementById('mini-player');
-const miniTitle = document.getElementById('mini-title');
-const miniTime = document.getElementById('mini-time');
-const miniPlay = document.getElementById('mini-play');
-const miniPause = document.getElementById('mini-pause');
-const miniProgressFill = document.getElementById('mini-progress-fill');
 let canplayAbort = null;
 
 export function initPlayer() {
@@ -71,7 +65,6 @@ export function initPlayer() {
     }
     state.playingItemId = null;
     state.playingItem = null;
-    updateMiniPlayer();
   });
 
   state.audio.addEventListener('play', () => {
@@ -105,22 +98,6 @@ export function initPlayer() {
   scrubber.addEventListener('mouseup', finishScrub);
   scrubber.addEventListener('touchend', finishScrub);
   scrubber.addEventListener('change', finishScrub);
-
-  // Mini player
-  miniPlay.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (state.playingItemId) {
-      state.audio.play();
-      state.playing = true;
-      syncButtons();
-      startTick();
-      startProgressSave();
-      updateMiniPlayer();
-    } else {
-      play();
-    }
-  });
-  miniPause.addEventListener('click', (e) => { e.stopPropagation(); pause(); });
 
   // Keyboard
   document.addEventListener('keydown', e => {
@@ -161,7 +138,6 @@ export function loadAudio(item) {
     }, { once: true, signal: canplayAbort.signal });
   }
 
-  updateMiniPlayer();
 }
 
 export function play() {
@@ -179,7 +155,6 @@ export function play() {
   syncButtons();
   startTick();
   startProgressSave();
-  updateMiniPlayer();
 }
 
 export function pause() {
@@ -189,7 +164,6 @@ export function pause() {
   stopTick();
   stopProgressSave();
   saveProgress();
-  updateMiniPlayer();
 }
 
 export function stop() {
@@ -241,8 +215,6 @@ export function seekToSentence(index) {
 function syncButtons() {
   btnPlay.classList.toggle('is-hidden', state.playing);
   btnPause.classList.toggle('is-hidden', !state.playing);
-  miniPlay.classList.toggle('is-hidden', state.playing);
-  miniPause.classList.toggle('is-hidden', !state.playing);
 }
 
 function startTick() {
@@ -256,8 +228,7 @@ function startTick() {
         timeCurrent.textContent = formatTime(currentMs);
         highlightCurrentSentence();
       }
-      updateMiniPlayer();
-    }
+      }
   }, 100);
 }
 
@@ -293,25 +264,6 @@ function stopProgressSave() {
     clearInterval(state.progressSaveInterval);
     state.progressSaveInterval = null;
   }
-}
-
-export function updateMiniPlayer() {
-  const loaded = state.playingItemId && state.audio.src;
-  const show = loaded && state.playingItemId !== state.currentItemId;
-
-  if (!show) {
-    miniPlayer.classList.remove('is-visible');
-    document.querySelector('.app').classList.remove('has-mini-player');
-    return;
-  }
-
-  miniPlayer.classList.add('is-visible');
-  document.querySelector('.app').classList.add('has-mini-player');
-  miniTitle.textContent = state.playingItem.title;
-  const currentMs = state.audio.currentTime * 1000;
-  const total = (state.playingItem.total_duration_ms) || 1;
-  miniTime.textContent = `${formatTime(currentMs)} / ${formatTime(total)}`;
-  miniProgressFill.style.width = `${(currentMs / total) * 100}%`;
 }
 
 export function prepareControls(item) {

@@ -2,7 +2,7 @@ import { api, connectSSE } from './api.js';
 import { state } from './state.js';
 import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
 import { initReaderHighlight, renderContent } from './reader-highlight.js';
-import { initPlayer, stop, seekToSentence, updateMiniPlayer, prepareControls } from './player.js';
+import { initPlayer, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
 import { initSettings } from './settings.js';
 
@@ -10,7 +10,6 @@ const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
 const interruptedState = document.getElementById('interrupted-state');
 const interruptedRetry = document.getElementById('interrupted-retry');
-const miniPlayer = document.getElementById('mini-player');
 const controlsEl = document.querySelector('.controls');
 
 let openItemVersion = 0;
@@ -27,7 +26,6 @@ initSidebar({
       state.currentItem = null;
       showView('empty');
     }
-    updateMiniPlayer();
   },
 });
 
@@ -65,15 +63,8 @@ connectSSE({
       state.currentItem = null;
       showView('empty');
     }
-    updateMiniPlayer();
     loadView(state.currentView);
   },
-});
-
-miniPlayer.addEventListener('click', () => {
-  if (state.playingItemId) {
-    openItem(state.playingItemId);
-  }
 });
 
 loadView('recent');
@@ -93,7 +84,6 @@ async function openItem(itemId) {
 
   if (!data.item.audio_ready && data.item.interrupted) {
     showView('interrupted');
-    updateMiniPlayer();
     return;
   }
 
@@ -115,7 +105,6 @@ async function openItem(itemId) {
     controlsEl.classList.add('is-hidden');
   }
 
-  updateMiniPlayer();
 }
 
 interruptedRetry.addEventListener('click', async () => {

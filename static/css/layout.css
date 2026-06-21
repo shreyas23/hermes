@@ -22,10 +22,6 @@ body {
   height: 100vh;
 }
 
-.app.has-mini-player {
-  height: calc(100vh - var(--mini-player-height));
-}
-
 /* Sidebar */
 .sidebar {
   width: var(--sidebar-width);
