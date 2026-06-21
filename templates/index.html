@@ -22,6 +22,11 @@
       <div class="sidebar__header">
         <h1 class="sidebar__title">Hermes</h1>
         <div class="sidebar__actions">
+          <button class="sidebar__add" id="btn-discover" title="Discover articles">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
+            </svg>
+          </button>
           <button class="sidebar__add" id="btn-add" title="Import">+</button>
         </div>
       </div>
@@ -59,24 +64,6 @@
         <p class="empty-state__text">Import a file, paste a URL, or add text to start listening</p>
       </div>
 
-      <div class="generating-state" id="generating-state">
-        <div class="generating-state__title" id="gen-title"></div>
-        <div class="generating-state__bar">
-          <div class="generating-state__fill" id="gen-progress-fill"></div>
-        </div>
-        <div class="generating-state__status" id="gen-status"></div>
-        <div class="generating-state__actions">
-          <button class="generating-state__cancel" id="gen-cancel">Cancel</button>
-          <button class="generating-state__retry is-hidden" id="gen-retry">Retry</button>
-        </div>
-      </div>
-
-      <div class="interrupted-state" id="interrupted-state">
-        <div class="interrupted-state__title">Audio generation was interrupted</div>
-        <div class="interrupted-state__status">Regenerate the audio to listen to this item.</div>
-        <button class="interrupted-state__retry" id="interrupted-retry">Regenerate Audio</button>
-      </div>
-
       <div class="player-state" id="player-state">
         <div class="reader" id="reader-view">
           <button class="reader__toc-btn is-hidden" id="btn-toc" title="Table of Contents">
@@ -111,6 +98,16 @@
             <span id="status-text"></span>
           </div>
         </div>
+
+        <div class="audio-gen is-hidden" id="audio-gen">
+          <button class="audio-gen__action" id="audio-gen-action">Generate audio</button>
+          <div class="audio-gen__progress is-hidden" id="audio-gen-progress">
+            <div class="audio-gen__track"><div class="audio-gen__fill" id="audio-gen-fill"></div></div>
+            <span class="audio-gen__pct" id="audio-gen-pct">0%</span>
+            <button class="audio-gen__cancel" id="audio-gen-cancel">Cancel</button>
+          </div>
+          <div class="audio-gen__note" id="audio-gen-note"></div>
+        </div>
       </div>
     </main>
   </div>
@@ -118,6 +115,7 @@
   <div class="modal-backdrop" id="import-modal">
     <div class="modal-backdrop__click-target" id="import-backdrop"></div>
     <div class="modal" role="dialog" aria-label="Import">
+      <button class="modal__close" title="Close" aria-label="Close">&times;</button>
       <h2 class="modal__title">Import</h2>
       <div class="modal__tabs">
         <button class="modal__tab is-active" data-tab="url">URL</button>
@@ -152,9 +150,45 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="discover-modal">
+    <div class="modal-backdrop__click-target" id="discover-backdrop"></div>
+    <div class="modal modal--wide" role="dialog" aria-label="Discover">
+      <button class="modal__close" title="Close" aria-label="Close">&times;</button>
+      <h2 class="modal__title">Discover</h2>
+      <div class="modal__tabs">
+        <button class="modal__tab is-active" data-tab="search">Search</button>
+        <button class="modal__tab" data-tab="feeds">Feeds</button>
+      </div>
+
+      <div class="modal__pane is-active" id="discover-pane-search">
+        <div class="discover__bar">
+          <input type="text" class="modal__input discover__bar-input" id="discover-search-input" placeholder="Search Wikipedia…">
+          <button class="modal__submit" id="discover-search-btn">Search</button>
+        </div>
+        <div class="discover__results" id="discover-search-results"></div>
+      </div>
+
+      <div class="modal__pane" id="discover-pane-feeds">
+        <div class="discover__bar">
+          <input type="text" class="modal__input discover__bar-input" id="discover-feed-input" placeholder="Add RSS or Substack feed URL…">
+          <button class="modal__submit" id="discover-feed-add-btn">Subscribe</button>
+        </div>
+        <div class="discover__feeds" id="discover-feed-list"></div>
+        <div class="discover__section-label">Latest</div>
+        <div class="discover__results" id="discover-feed-entries"></div>
+      </div>
+
+      <div class="modal__actions">
+        <button class="modal__cancel" id="discover-close">Cancel</button>
+        <button class="modal__submit" id="discover-done">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="settings-modal">
     <div id="settings-backdrop" style="position:absolute;inset:0"></div>
     <div class="modal" role="dialog" aria-label="Settings" style="position:relative;z-index:1">
+      <button class="modal__close" title="Close" aria-label="Close">&times;</button>
       <h2 class="modal__title">Settings</h2>
 
       <div class="settings-group">
@@ -186,6 +220,16 @@
 
       <button class="modal__submit" id="settings-save">Save</button>
       <button class="modal__cancel" id="settings-close">Cancel</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirm-modal">
+    <div class="modal-backdrop__click-target" id="confirm-backdrop"></div>
+    <div class="modal modal--narrow" role="dialog" aria-label="Confirm">
+      <h2 class="modal__title" id="confirm-title">Are you sure?</h2>
+      <p class="confirm__message" id="confirm-message"></p>
+      <button class="modal__submit modal__submit--destructive" id="confirm-ok">Delete</button>
+      <button class="modal__cancel" id="confirm-cancel">Cancel</button>
     </div>
   </div>
 

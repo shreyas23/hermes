@@ -212,12 +212,139 @@ def extract_with_images(file_path: str, image_dir: str = None) -> dict | None:
         return None
 
 
+_WIKI_CITATION_RE = re.compile(
+    r'\[(?:\d+[a-z]?|note\s+\d+|nb\s+\d+|citation needed|edit|update|'
+    r'clarification needed|page needed|who\?|when\?|why\?)\]',
+    re.IGNORECASE,
+)
+
+
+def _is_wikipedia_url(url: str) -> bool:
+    return 'wikipedia.org/wiki/' in (url or '')
+
+
+def _strip_wikipedia_cruft(soup) -> None:
+    """Remove Wikipedia citation markers, edit links, and reference/nav blocks
+    so they are neither displayed nor read aloud."""
+    for sel in ('sup.reference', 'span.mw-editsection', 'ol.references',
+                'div.reflist', 'div.refbegin', 'div.navbox', 'table.navbox',
+                'div.mw-references-wrap', 'div.hatnote'):
+        for el in soup.select(sel):
+            el.decompose()
+    for cls in ('noprint', 'mw-cite-backlink', 'mw-empty-elt', 'reference'):
+        for el in soup.find_all(class_=cls):
+            el.decompose()
+
+
+def _strip_citation_text(soup) -> None:
+    """Safety net: remove any bracketed citation markers left in plain text."""
+    for node in soup.find_all(string=_WIKI_CITATION_RE.search):
+        node.replace_with(_WIKI_CITATION_RE.sub('', node))
+
+
+_HEADING_RE = re.compile(r'^h[1-6]$')
+
+
+def _strip_empty_paragraphs(soup) -> None:
+    """Drop paragraphs with no text or image (e.g. leftover navbox-styles)."""
+    for p in soup.find_all('p'):
+        if p.find(_HEADING_RE):
+            continue  # heading wrapper — not empty
+        if not p.get_text(strip=True) and not p.find('img'):
+            p.decompose()
+
+
+def _heading_wrapper(node):
+    """If node is a heading (or a <p> wrapping one), return (wrapper, level)."""
+    name = getattr(node, 'name', None)
+    if not name:
+        return None, None
+    if _HEADING_RE.match(name):
+        parent = node.parent
+        if parent is not None and parent.name == 'p' and 'mw-heading' in (parent.get('class') or []):
+            return parent, int(name[1])
+        return node, int(name[1])
+    if name == 'p':
+        h = node.find(_HEADING_RE)
+        if h:
+            return node, int(h.name[1])
+    return None, None
+
+
+_APPENDIX_TITLES = {
+    'see also', 'notes', 'references', 'citations', 'sources', 'footnotes',
+    'explanatory notes', 'notes and references', 'general sources', 'general references',
+    'bibliography', 'works cited', 'further reading', 'external links',
+}
+
+
+def _strip_appendix_sections(soup) -> None:
+    """Remove standard Wikipedia appendix sections (See also, References, External
+    links, etc.) — heading plus its whole span — since they are reference/navigation
+    apparatus, not article prose, even when they still contain links."""
+    for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        wrapper, level = _heading_wrapper(heading)
+        if wrapper is None or wrapper.parent is None:
+            continue
+        if heading.get_text(strip=True).lower() not in _APPENDIX_TITLES:
+            continue
+        to_remove = [wrapper]
+        for sib in wrapper.next_siblings:
+            _, sib_level = _heading_wrapper(sib)
+            if sib_level is not None and sib_level <= level:
+                break
+            to_remove.append(sib)
+        for el in to_remove:
+            if hasattr(el, 'decompose'):
+                el.decompose()
+            else:
+                el.extract()
+
+
+def _strip_empty_sections(soup) -> None:
+    """Remove headings whose section has no content — the orphaned appendix
+    headers (See also, References, etc.) left behind once their reference and
+    link lists are stripped. Iterates so empty parents collapse after their
+    empty children are removed."""
+    changed = True
+    while changed:
+        changed = False
+        for heading in soup.find_all(list('h%d' % i for i in range(1, 7))):
+            wrapper, level = _heading_wrapper(heading)
+            if wrapper is None or wrapper.parent is None:
+                continue
+            empty = True
+            for sib in wrapper.next_siblings:
+                _, sib_level = _heading_wrapper(sib)
+                if sib_level is not None:
+                    if sib_level <= level:
+                        break          # next section at same or higher level
+                    continue           # deeper subheading — handled on its own
+                name = getattr(sib, 'name', None)
+                if name is None:
+                    # NavigableString (note: it is a str subclass, so guard before .find)
+                    if str(sib).strip():
+                        empty = False
+                        break
+                    continue
+                if name == 'img' or sib.find('img') or sib.get_text(strip=True):
+                    empty = False
+                    break
+            if empty:
+                wrapper.decompose()
+                changed = True
+
+
 def clean_html_for_reader(html: str, base_url: str) -> tuple[str, str]:
     from readability import Document
     from bs4 import BeautifulSoup
 
+    is_wikipedia = _is_wikipedia_url(base_url)
+
     # Pre-process: unwrap <picture> to expose <img>, capture dimensions
     orig_soup = BeautifulSoup(html, 'html.parser')
+    if is_wikipedia:
+        _strip_wikipedia_cruft(orig_soup)
     img_dims = {}
     for img in orig_soup.find_all('img'):
         src = img.get('src', '')
@@ -246,6 +373,12 @@ def clean_html_for_reader(html: str, base_url: str) -> tuple[str, str]:
     doc_title = raw_title if raw_title and raw_title != '[no-title]' else None
 
     soup = BeautifulSoup(reader_html, 'html.parser')
+    if is_wikipedia:
+        _strip_wikipedia_cruft(soup)
+        _strip_citation_text(soup)
+        _strip_appendix_sections(soup)
+        _strip_empty_paragraphs(soup)
+        _strip_empty_sections(soup)
 
     # Re-add title that readability extracts separately
     if doc_title:

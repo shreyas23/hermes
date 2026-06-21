@@ -4,13 +4,14 @@ import { initSidebar, loadView, loadCollections, updateGenerationProgress } from
 import { initReaderHighlight, renderContent } from './reader-highlight.js';
 import { initPlayer, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
+import { initDiscover } from './discover.js';
 import { initSettings } from './settings.js';
+import { initConfirm } from './confirm-modal.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
-const interruptedState = document.getElementById('interrupted-state');
-const interruptedRetry = document.getElementById('interrupted-retry');
 const controlsEl = document.querySelector('.controls');
+const audioGen = document.getElementById('audio-gen');
 
 let openItemVersion = 0;
 
@@ -34,12 +35,35 @@ initReaderHighlight((si) => {
 });
 initPlayer();
 initSettings();
+initConfirm();
 
-initModal({
-  onImport: (itemId, autoOpen = true) => {
-    loadView(state.currentView);
-    if (autoOpen) openItem(itemId);
-  },
+const onImport = (itemId, autoOpen = true) => {
+  loadView(state.currentView);
+  if (autoOpen) openItem(itemId);
+};
+initModal({ onImport });
+initDiscover({ onImport });
+
+// Generic close affordance: any modal X button closes its backdrop.
+document.querySelectorAll('.modal__close').forEach(btn => {
+  btn.addEventListener('click', () => btn.closest('.modal-backdrop')?.classList.remove('is-visible'));
+});
+
+// Opt-in audio generation controls.
+document.getElementById('audio-gen-action').addEventListener('click', async () => {
+  const id = state.currentItemId;
+  if (!id) return;
+  const data = await api(`/api/library/${id}/generate`, { method: 'POST' });
+  if (data.error) return;
+  if (state.currentItem) state.currentItem.generating = true;
+  renderAudioGen({ generating: true });
+  loadView(state.currentView);
+});
+
+document.getElementById('audio-gen-cancel').addEventListener('click', async () => {
+  const id = state.currentItemId;
+  if (!id) return;
+  await api(`/api/library/${id}/cancel`, { method: 'POST' });
 });
 
 connectSSE({
@@ -47,6 +71,9 @@ connectSSE({
     const total = data.total || 1;
     const pct = Math.round((data.done / total) * 100);
     updateGenerationProgress(data.item_id, pct);
+    if (data.item_id === state.currentItemId && !state.currentItem?.audio_ready) {
+      setGenProgress(pct);
+    }
   },
   generation_complete: (data) => {
     if (data.item_id === state.currentItemId) {
@@ -55,13 +82,9 @@ connectSSE({
     loadView(state.currentView);
   },
   generation_cancelled: (data) => {
-    if (data.item_id === state.playingItemId) {
-      stop();
-    }
+    // Cancelling generation returns the item to a pending state; it is not deleted.
     if (data.item_id === state.currentItemId) {
-      state.currentItemId = null;
-      state.currentItem = null;
-      showView('empty');
+      openItem(state.currentItemId);
     }
     loadView(state.currentView);
   },
@@ -79,45 +102,60 @@ async function openItem(itemId) {
   if (data.error || version !== openItemVersion) return;
 
   state.currentItem = data.item;
+  const item = data.item;
 
   document.querySelectorAll('.item').forEach(el => el.classList.remove('is-active'));
 
-  if (!data.item.audio_ready && data.item.interrupted) {
-    showView('interrupted');
-    return;
-  }
-
+  // The reader is always shown so text is readable before (or without) audio.
   showView('player');
-  renderContent(data.item);
+  renderContent(item);
 
   const isPlaying = itemId === state.playingItemId;
 
-  if (isPlaying) {
-    // Viewing the item whose audio is loaded — show full controls, sync timeline.
-    state.timeline = data.item.timeline || [];
-    state.totalDurationMs = data.item.total_duration_ms;
+  if (item.audio_ready) {
+    hideAudioGen();
     controlsEl.classList.remove('is-hidden');
-  } else if (data.item.audio_ready) {
-    // Viewing a non-playing item that has audio — show controls without loading.
-    controlsEl.classList.remove('is-hidden');
-    prepareControls(data.item);
+    if (isPlaying) {
+      // Viewing the item whose audio is loaded — sync timeline.
+      state.timeline = item.timeline || [];
+      state.totalDurationMs = item.total_duration_ms;
+    } else {
+      prepareControls(item);
+    }
   } else {
+    // Pending / generating / interrupted — hide transport, show the audio-gen bar.
     controlsEl.classList.add('is-hidden');
+    renderAudioGen(item);
   }
-
 }
 
-interruptedRetry.addEventListener('click', async () => {
-  const itemId = state.currentItemId;
-  if (!itemId) return;
-  const data = await api(`/api/library/${itemId}/retry`, { method: 'POST' });
-  if (data.error) return;
-  showView('empty');
-  loadView(state.currentView);
-});
+function renderAudioGen(item) {
+  audioGen.classList.remove('is-hidden');
+  const action = document.getElementById('audio-gen-action');
+  const progress = document.getElementById('audio-gen-progress');
+  const note = document.getElementById('audio-gen-note');
+  if (item.generating) {
+    action.classList.add('is-hidden');
+    progress.classList.remove('is-hidden');
+    note.textContent = '';
+  } else {
+    action.classList.remove('is-hidden');
+    progress.classList.add('is-hidden');
+    note.textContent = item.interrupted ? 'Audio generation was interrupted.' : '';
+    setGenProgress(0);
+  }
+}
+
+function hideAudioGen() {
+  audioGen.classList.add('is-hidden');
+}
+
+function setGenProgress(pct) {
+  document.getElementById('audio-gen-fill').style.width = `${pct}%`;
+  document.getElementById('audio-gen-pct').textContent = `${pct}%`;
+}
 
 function showView(view) {
   emptyState.classList.toggle('is-hidden', view !== 'empty');
   playerState.classList.toggle('is-visible', view === 'player');
-  interruptedState.classList.toggle('is-visible', view === 'interrupted');
 }

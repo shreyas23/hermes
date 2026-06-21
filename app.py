@@ -13,11 +13,13 @@ from audio import generate_audio_background, cancel_generation, is_generating
 from extractors import SUPPORTED_EXTENSIONS, extract_with_images, extract_url_with_images, map_images_to_sentences, clean_html_for_reader, inject_sentence_spans
 from models import (
     init_db, add_item, find_duplicate, get_item, get_items, get_recent, get_in_progress,
-    search_items, update_progress, delete_item, item_master_wav, item_master_m4a,
+    search_items, update_progress, set_audio_requested, delete_item, item_master_wav, item_master_m4a,
     item_images_dir, create_collection, get_collections, add_to_collection,
     remove_from_collection, delete_collection,
+    add_feed, get_feeds, find_feed, delete_feed,
     get_all_settings, get_setting, set_setting,
 )
+from discovery import search_wikipedia, load_feed, fetch_entries
 
 app = Flask(__name__)
 segmenter = Segmenter(language='en', clean=False)
@@ -82,8 +84,10 @@ def library_item(item_id):
         return jsonify({'error': 'Not found'}), 404
     audio_ready = bool(item['audio_ready'])
     generating = not audio_ready and is_generating(item['id'])
+    requested = bool(item.get('audio_requested'))
     item['generating'] = generating
-    item['interrupted'] = not audio_ready and not generating
+    item['pending'] = not audio_ready and not generating and not requested
+    item['interrupted'] = not audio_ready and not generating and requested
     return jsonify({'item': item})
 
 
@@ -96,10 +100,9 @@ def library_delete(item_id):
 
 @app.route('/api/library/<int:item_id>/cancel', methods=['POST'])
 def library_cancel(item_id):
-    cancelled = cancel_generation(item_id)
-    if cancelled:
-        delete_item(item_id)
-        broadcast_sse('generation_cancelled', {'item_id': item_id})
+    cancelled = cancel_generation(item_id, wait=True)
+    set_audio_requested(item_id, False)
+    broadcast_sse('generation_cancelled', {'item_id': item_id})
     return jsonify({'cancelled': cancelled})
 
 
@@ -115,15 +118,17 @@ def library_progress(item_id):
     return jsonify({'saved': True})
 
 
-@app.route('/api/library/<int:item_id>/retry', methods=['POST'])
-def library_retry(item_id):
+@app.route('/api/library/<int:item_id>/generate', methods=['POST'])
+def library_generate(item_id):
     item = get_item(item_id)
     if not item:
         return jsonify({'error': 'Not found'}), 404
     if item['audio_ready']:
         return jsonify({'error': 'Audio already generated'}), 400
+    if is_generating(item_id):
+        return jsonify({'error': 'Already generating'}), 400
     _start_generation(item_id, item['sentences'])
-    return jsonify({'retrying': True, 'item_id': item_id})
+    return jsonify({'generating': True, 'item_id': item_id})
 
 
 @app.route('/api/library/<int:item_id>/images/<path:filename>')
@@ -206,7 +211,6 @@ def import_file():
         _rmdir_safe(img_dir)
         raise
 
-    _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
 
 
@@ -288,7 +292,6 @@ def import_url():
                 _rmdir_safe(img_dir)
                 raise
 
-            _start_generation(item_id, sentences)
             return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
         finally:
             os.unlink(tmp_path)
@@ -325,7 +328,6 @@ def import_url():
         reader_html=reader_html,
     )
 
-    _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
 
 
@@ -348,7 +350,6 @@ def import_text():
         sentences=sentences,
     )
 
-    _start_generation(item_id, sentences)
     return jsonify({'item_id': item_id, 'title': title, 'sentence_count': len(sentences)})
 
 
@@ -365,6 +366,59 @@ def import_folder():
             files.append({'name': f.name, 'path': str(f), 'ext': f.suffix.lower()})
 
     return jsonify({'folder': folder, 'files': files})
+
+
+# --- Discovery ---
+
+@app.route('/api/discover/wikipedia', methods=['GET'])
+def discover_wikipedia():
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'results': []})
+    try:
+        results = search_wikipedia(query)
+    except Exception as e:
+        return jsonify({'error': f'Search failed: {e}'}), 502
+    return jsonify({'results': results})
+
+
+@app.route('/api/feeds', methods=['GET'])
+def list_feeds():
+    return jsonify({'feeds': get_feeds()})
+
+
+@app.route('/api/feeds', methods=['POST'])
+def subscribe_feed():
+    url = (request.json or {}).get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'No feed URL provided'}), 400
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    existing = find_feed(url)
+    if existing:
+        return jsonify({'error': 'Already subscribed', 'feed': existing}), 409
+
+    try:
+        meta, _entries = load_feed(url)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Could not load feed: {e}'}), 400
+
+    feed_id = add_feed(meta['title'], url, meta['site_url'])
+    return jsonify({'id': feed_id, 'title': meta['title']})
+
+
+@app.route('/api/feeds/<int:feed_id>', methods=['DELETE'])
+def unsubscribe_feed(feed_id):
+    delete_feed(feed_id)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/feeds/entries', methods=['GET'])
+def feed_entries():
+    return jsonify({'entries': fetch_entries(get_feeds())})
 
 
 # --- Collections ---
@@ -523,6 +577,8 @@ def _split(text):
 
 
 def _start_generation(item_id, sentences):
+    set_audio_requested(item_id, True)
+
     def on_progress(done, total):
         broadcast_sse('generation_progress', {
             'item_id': item_id, 'done': done, 'total': total,
@@ -544,6 +600,7 @@ def _start_generation(item_id, sentences):
 def _item_summary(item):
     audio_ready = bool(item['audio_ready'])
     generating = not audio_ready and is_generating(item['id'])
+    requested = bool(item['audio_requested'])
     return {
         'id': item['id'],
         'title': item['title'],
@@ -551,7 +608,8 @@ def _item_summary(item):
         'source_url': item.get('source_url'),
         'audio_ready': audio_ready,
         'generating': generating,
-        'interrupted': not audio_ready and not generating,
+        'pending': not audio_ready and not generating and not requested,
+        'interrupted': not audio_ready and not generating and requested,
         'total_duration_ms': item['total_duration_ms'],
         'sentence_count': len(item['sentences']),
         'created_at': item['created_at'],

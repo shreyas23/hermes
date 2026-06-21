@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { state } from './state.js';
 import { showContextMenu } from './contextmenu.js';
+import { confirmAction } from './confirm-modal.js';
 import { toastSuccess } from './toast.js';
 import { formatTime, escHtml } from './utils.js';
 
@@ -93,9 +94,9 @@ function renderItemList(items) {
     const dur = item.audio_ready ? formatTime(item.total_duration_ms) : '';
     let badge = '';
     if (!item.audio_ready) {
-      badge = item.interrupted
-        ? '<span class="badge badge--interrupted">interrupted</span>'
-        : '<span class="badge badge--generating">generating</span>';
+      if (item.generating) badge = '<span class="badge badge--generating">generating</span>';
+      else if (item.interrupted) badge = '<span class="badge badge--interrupted">interrupted</span>';
+      else badge = '<span class="badge badge--pending">no audio</span>';
     }
     let progress = '';
     if (item.audio_ready && item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished && item.total_duration_ms > 0) {
@@ -103,7 +104,7 @@ function renderItemList(items) {
       progress = `<div class="item__progress"><div class="item__progress-fill" style="width:${pct}%"></div></div>`;
     }
 
-    const genBar = !item.audio_ready
+    const genBar = item.generating
       ? `<div class="item__progress item__progress--gen" data-gen-id="${item.id}"><div class="item__progress-fill" style="width:0%"></div></div>`
       : '';
 
@@ -126,13 +127,13 @@ function renderItemList(items) {
       e.preventDefault();
       e.stopPropagation();
       const actions = [
-        { label: 'Play', onClick: () => onItemOpen?.(item.id) },
+        { label: 'Open', onClick: () => onItemOpen?.(item.id) },
       ];
-      if (item.interrupted) {
+      if (!item.audio_ready && !item.generating) {
         actions.push({
-          label: 'Regenerate',
+          label: item.interrupted ? 'Regenerate audio' : 'Generate audio',
           onClick: async () => {
-            const data = await api(`/api/library/${item.id}/retry`, { method: 'POST' });
+            const data = await api(`/api/library/${item.id}/generate`, { method: 'POST' });
             if (data.error) return;
             loadView(state.currentView);
           },
@@ -157,7 +158,7 @@ function renderItemList(items) {
         label: 'Delete',
         destructive: true,
         onClick: async () => {
-          if (!confirm(`Delete "${item.title}"?`)) return;
+          if (!await confirmAction({ title: 'Delete item?', message: `"${item.title}" will be permanently removed from your library.`, confirmLabel: 'Delete' })) return;
           await api(`/api/library/${item.id}`, { method: 'DELETE' });
           onItemDelete?.(item.id);
           loadView(state.currentView);
@@ -168,7 +169,7 @@ function renderItemList(items) {
     });
     el.querySelector('.item__delete').addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm(`Delete "${item.title}"?`)) return;
+      if (!await confirmAction({ title: 'Delete item?', message: `"${item.title}" will be permanently removed from your library.`, confirmLabel: 'Delete' })) return;
       await api(`/api/library/${item.id}`, { method: 'DELETE' });
       onItemDelete?.(item.id);
       loadView(state.currentView);

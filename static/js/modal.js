@@ -12,10 +12,12 @@ export function initModal({ onImport }) {
   document.getElementById('import-backdrop').addEventListener('click', close);
   document.getElementById('import-close').addEventListener('click', close);
 
-  document.querySelectorAll('.modal__tab').forEach(tab => {
+  // Scope tab wiring to the import modal — the Discover modal reuses .modal__tab
+  // and handles its own tabs in discover.js.
+  backdrop.querySelectorAll('.modal__tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.modal__tab').forEach(t => t.classList.remove('is-active'));
-      document.querySelectorAll('.modal__pane').forEach(p => p.classList.remove('is-active'));
+      backdrop.querySelectorAll('.modal__tab').forEach(t => t.classList.remove('is-active'));
+      backdrop.querySelectorAll('.modal__pane').forEach(p => p.classList.remove('is-active'));
       tab.classList.add('is-active');
       document.getElementById(`pane-${tab.dataset.tab}`).classList.add('is-active');
     });

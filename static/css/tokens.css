@@ -88,6 +88,9 @@
   --sidebar-width: 260px;
   --play-btn-size: 44px;
   --modal-width: 480px;
+  --modal-width-wide: 600px;
+  --modal-width-narrow: 400px;
+  --discover-list-height: 320px;
   --teleprompter-padding-x: var(--space-12);
   --teleprompter-fade-height: 100px;
 

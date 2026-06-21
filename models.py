@@ -54,8 +54,17 @@ def init_db():
                 position INTEGER DEFAULT 0,
                 PRIMARY KEY (collection_id, item_id)
             );
+
+            CREATE TABLE IF NOT EXISTS feeds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                feed_url TEXT NOT NULL UNIQUE,
+                site_url TEXT,
+                added_at REAL NOT NULL,
+                last_fetched REAL
+            );
         ''')
-        for col in ['images TEXT', 'reader_html TEXT', 'toc TEXT']:
+        for col in ['images TEXT', 'reader_html TEXT', 'toc TEXT', 'audio_requested INTEGER DEFAULT 0']:
             try:
                 db.execute(f'ALTER TABLE items ADD COLUMN {col}')
             except sqlite3.OperationalError:
@@ -176,7 +185,7 @@ _ITEMS_WITH_PROGRESS = '''
 
 _ITEMS_SUMMARY = '''
     SELECT i.id, i.title, i.source_type, i.source_url, i.sentences,
-           i.total_duration_ms, i.audio_ready, i.created_at,
+           i.total_duration_ms, i.audio_ready, i.audio_requested, i.created_at,
            p.current_sentence AS p_current_sentence,
            p.current_time_ms AS p_current_time_ms,
            p.is_finished AS p_is_finished,
@@ -254,6 +263,11 @@ def update_progress(item_id, current_sentence, current_time_ms, is_finished=Fals
         )
 
 
+def set_audio_requested(item_id, requested):
+    with get_db() as db:
+        db.execute('UPDATE items SET audio_requested = ? WHERE id = ?', (int(requested), item_id))
+
+
 def delete_item(item_id):
     for d in [item_audio_dir(item_id), item_images_dir(item_id)]:
         if os.path.isdir(d):
@@ -306,6 +320,40 @@ def remove_from_collection(collection_id, item_id):
 def delete_collection(collection_id):
     with get_db() as db:
         db.execute('DELETE FROM collections WHERE id = ?', (collection_id,))
+
+
+# --- Feed subscriptions ---
+
+def add_feed(title, feed_url, site_url=None):
+    now = time.time()
+    with get_db() as db:
+        cur = db.execute(
+            'INSERT INTO feeds (title, feed_url, site_url, added_at) VALUES (?, ?, ?, ?)',
+            (title, feed_url, site_url, now)
+        )
+        return cur.lastrowid
+
+
+def get_feeds():
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT id, title, feed_url, site_url, added_at, last_fetched '
+            'FROM feeds ORDER BY title COLLATE NOCASE'
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def find_feed(feed_url):
+    with get_db() as db:
+        row = db.execute(
+            'SELECT id, title FROM feeds WHERE feed_url = ?', (feed_url,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def delete_feed(feed_id):
+    with get_db() as db:
+        db.execute('DELETE FROM feeds WHERE id = ?', (feed_id,))
 
 
 DEFAULTS = {
