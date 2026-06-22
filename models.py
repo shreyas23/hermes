@@ -86,6 +86,15 @@ def init_db():
             )
         """)
 
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS watch_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL UNIQUE,
+                added_at REAL NOT NULL,
+                last_scanned REAL
+            )
+        """)
+
 
 @contextmanager
 def get_db():
@@ -420,6 +429,34 @@ def update_bookmark_note(bookmark_id, note):
 def delete_bookmark(bookmark_id):
     with get_db() as db:
         db.execute("DELETE FROM bookmarks WHERE id = ?", (bookmark_id,))
+
+
+# --- Watch folders ---
+
+
+def add_watch_folder(path):
+    with get_db() as db:
+        cur = db.execute(
+            "INSERT INTO watch_folders (path, added_at) VALUES (?, ?)",
+            (path, time.time()),
+        )
+        return cur.lastrowid
+
+
+def remove_watch_folder(folder_id):
+    with get_db() as db:
+        db.execute("DELETE FROM watch_folders WHERE id = ?", (folder_id,))
+
+
+def get_watch_folders():
+    with get_db() as db:
+        rows = db.execute("SELECT * FROM watch_folders ORDER BY added_at").fetchall()
+        return [dict(r) for r in rows]
+
+
+def update_watch_folder_scanned(folder_id):
+    with get_db() as db:
+        db.execute("UPDATE watch_folders SET last_scanned = ? WHERE id = ?", (time.time(), folder_id))
 
 
 DEFAULTS = {

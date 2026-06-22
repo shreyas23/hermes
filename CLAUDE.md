@@ -46,7 +46,8 @@ Hermes is a **productive information hub**, not just a document reader. The goal
 - `static/js/bookmarks.js` — Bookmarks & annotations panel
 - `static/js/discover.js` — Discover modal: Wikipedia search + feed subscriptions
 - `static/js/sidebar.js` — Library sidebar, item list, navigation
-- `static/js/settings.js` — Settings modal logic, design/theme switching
+- `static/js/drag-drop.js` — Drag-and-drop file import (overlay UI, multipart upload)
+- `static/js/settings.js` — Settings modal logic, design/theme switching, watch folder management
 - `static/js/confirm-modal.js` — Reusable promise-based confirmation modal
 - `static/css/tokens.css` — Design tokens (colors, spacing, typography, glass tokens, accent glows)
 - `static/css/layout.css` — App shell layout (sidebar, main area)
@@ -78,7 +79,7 @@ cd ~/hermes && uv run python app.py
 
 ## Import flow
 
-1. User imports via URL, file path, folder scan, or pasted text
+1. User imports via URL, file path, folder scan, pasted text, drag-and-drop (multipart upload via `/api/import/upload`), or auto-import from watch folders (background scanner, 30s interval)
 2. Text extracted → split into sentences → stored in SQLite
 3. **PDFs:** pymupdf4llm extracts structured markdown using `TocHeaders` for heading hierarchy from PDF bookmarks. Markdown is cleaned (TOC pages stripped, page footers removed, bold-only lines matching TOC entries promoted to headings), converted to HTML via the `markdown` library, and table rows/columns are merged to fix pymupdf4llm's cell-splitting artifacts. The result is stored as `reader_html` with a navigable `toc` (JSON array of `{level, title, id}` entries). Table rendering is controlled by the `pdf_tables` setting (default: `off`).
 4. **URLs:** readability extracts article HTML, cleaned and stored as `reader_html`
@@ -132,29 +133,25 @@ Stored in SQLite `settings` table. Key settings:
 
 Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
 
-**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item).
+**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item), drag-and-drop import (multipart upload), watch folders (background scanner every 30s, managed in Settings).
 
 **1. Capture & export** — close the loop on the comprehension tools we just shipped
 - **Export highlights** — export stored bookmarks & annotations (Markdown/file); builds directly on the `bookmarks` table
 
-**2. Reduce import friction** — remove the biggest UX papercut for getting content in
-- **Drag-and-drop import** — drop files onto the window to import
-- **Watch folders** — auto-import new files from designated directories
-
-**3. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
+**2. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
 - **Kokoro TTS** — Kokoro-82M runs locally on Apple Silicon with near-cloud quality. Eliminates the need for cloud TTS while keeping everything private. Multiple voices, fast inference via `kokoro-onnx`.
 - **OpenAI TTS** — optional cloud fallback for users who want the highest fidelity and don't mind API calls
 
-**4. Content expansion** — feeds are subscribable today; this makes them proactive
+**3. Content expansion** — feeds are subscribable today; this makes them proactive
 - **Background feed sync** — periodically pull new entries from subscribed feeds into the library (currently entries are fetched on-demand in Discover)
 - **Daily briefing** — auto-queue unread items by priority each morning (depends on play queue)
 
-**5. Reading statistics** — no competitor does this; ElevenReader has zero analytics
+**4. Reading statistics** — no competitor does this; ElevenReader has zero analytics
 - **Stats page** — listening time (daily/weekly/all-time), items completed, streak tracking, average session length
 - **Per-item stats** — time spent, % completed, replay count
 - **Genre/source breakdown** — listening distribution across source types (PDF, article, feed, text) and collections
 
-**6. Polish & export**
+**5. Polish & export**
 - **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
 - **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Auto-tagging** — tag items by topic automatically

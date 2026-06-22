@@ -3,6 +3,7 @@ import os
 import queue
 import re
 import threading
+import time
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
@@ -23,6 +24,7 @@ from models import (
     add_feed,
     add_item,
     add_to_collection,
+    add_watch_folder,
     create_collection,
     delete_bookmark,
     delete_collection,
@@ -39,19 +41,23 @@ from models import (
     get_items,
     get_recent,
     get_setting,
+    get_watch_folders,
     init_db,
     item_images_dir,
     item_master_m4a,
     item_master_wav,
     remove_from_collection,
+    remove_watch_folder,
     search_items,
     set_audio_requested,
     set_setting,
     update_bookmark_note,
     update_progress,
+    update_watch_folder_scanned,
 )
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 segmenter = Segmenter(language="en", clean=False)
 
 sse_queues: list[queue.Queue] = []
@@ -188,19 +194,16 @@ def library_audio(item_id):
 # --- Import endpoints ---
 
 
-@app.route("/api/import/file", methods=["POST"])
-def import_file():
-    body = request.json or {}
-    file_path = body.get("path", "")
-    if not os.path.isfile(file_path):
-        return jsonify({"error": "File not found"}), 404
+def _do_import_file(file_path, original_path=None, title=None):
+    """Extract text from a local file and create a library item.
 
-    if not body.get("force"):
-        existing = find_duplicate(original_path=file_path)
-        if existing:
-            return jsonify({"error": "duplicate", "existing": existing}), 409
-
+    Returns (item_id, title, sentence_count).
+    Raises ValueError if extraction fails.
+    """
     import uuid
+
+    if title is None:
+        title = Path(file_path).stem
 
     placeholder = f"tmp_{uuid.uuid4().hex[:12]}"
     img_dir = item_images_dir(placeholder)
@@ -209,13 +212,12 @@ def import_file():
     try:
         result = extract_with_images(file_path, img_dir)
         if not result or not result["text"].strip():
-            return jsonify({"error": "Could not extract text"}), 400
+            raise ValueError("Could not extract text")
 
         text = result["text"]
-        title = Path(file_path).stem
         sentences = _split(text)
         if not sentences:
-            return jsonify({"error": "No extractable text"}), 400
+            raise ValueError("No extractable text")
         images = map_images_to_sentences(result.get("images", []), text, sentences)
 
         reader_html = result.get("reader_html")
@@ -228,7 +230,7 @@ def import_file():
             source_type="document",
             text_content=text,
             sentences=sentences,
-            original_path=file_path,
+            original_path=original_path or file_path,
             images=images,
             reader_html=reader_html,
             toc=toc,
@@ -238,14 +240,61 @@ def import_file():
         if img_dir != real_img_dir:
             if os.path.isdir(img_dir) and os.listdir(img_dir):
                 os.makedirs(real_img_dir, exist_ok=True)
-                for f in os.listdir(img_dir):
-                    os.rename(os.path.join(img_dir, f), os.path.join(real_img_dir, f))
+                for fname in os.listdir(img_dir):
+                    os.rename(os.path.join(img_dir, fname), os.path.join(real_img_dir, fname))
             _rmdir_safe(img_dir)
     except Exception:
         _rmdir_safe(img_dir)
         raise
 
-    return jsonify({"item_id": item_id, "title": title, "sentence_count": len(sentences)})
+    return item_id, title, len(sentences)
+
+
+@app.route("/api/import/file", methods=["POST"])
+def import_file():
+    body = request.json or {}
+    file_path = body.get("path", "")
+    if not os.path.isfile(file_path):
+        return jsonify({"error": "File not found"}), 404
+
+    if not body.get("force"):
+        existing = find_duplicate(original_path=file_path)
+        if existing:
+            return jsonify({"error": "duplicate", "existing": existing}), 409
+
+    try:
+        item_id, title, count = _do_import_file(file_path)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"item_id": item_id, "title": title, "sentence_count": count})
+
+
+@app.route("/api/import/upload", methods=["POST"])
+def import_upload():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "No file selected"}), 400
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        return jsonify({"error": f"Unsupported file type: {ext}"}), 400
+
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        file.save(tmp)
+        tmp_path = tmp.name
+    try:
+        title = Path(file.filename).stem
+        item_id, title, count = _do_import_file(tmp_path, title=title)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        os.unlink(tmp_path)
+
+    return jsonify({"item_id": item_id, "title": title, "sentence_count": count})
 
 
 @app.route("/api/import/url", methods=["POST"])
@@ -553,6 +602,58 @@ def settings_update():
     return jsonify(get_all_settings())
 
 
+# --- Watch folders ---
+
+
+@app.route("/api/watch-folders", methods=["GET"])
+def list_watch_folders():
+    return jsonify({"folders": get_watch_folders()})
+
+
+@app.route("/api/watch-folders", methods=["POST"])
+def add_watch_folder_route():
+    path = (request.json or {}).get("path", "").strip()
+    path = os.path.expanduser(path)
+    if not os.path.isdir(path):
+        return jsonify({"error": "Directory not found"}), 404
+    try:
+        fid = add_watch_folder(path)
+    except Exception:
+        return jsonify({"error": "Folder already watched"}), 409
+    return jsonify({"id": fid, "path": path})
+
+
+@app.route("/api/watch-folders/<int:folder_id>", methods=["DELETE"])
+def delete_watch_folder(folder_id):
+    remove_watch_folder(folder_id)
+    return jsonify({"deleted": True})
+
+
+def _watch_folder_scanner():
+    time.sleep(10)
+    while True:
+        try:
+            folders = get_watch_folders()
+            for folder in folders:
+                path = folder["path"]
+                if not os.path.isdir(path):
+                    continue
+                for f in sorted(Path(path).iterdir()):
+                    if not f.is_file() or f.suffix.lower() not in SUPPORTED_EXTENSIONS:
+                        continue
+                    if find_duplicate(original_path=str(f)):
+                        continue
+                    try:
+                        item_id, title, _ = _do_import_file(str(f))
+                        broadcast_sse("watch_folder_import", {"item_id": item_id, "title": title})
+                    except Exception:
+                        pass
+                update_watch_folder_scanned(folder["id"])
+        except Exception:
+            pass
+        time.sleep(30)
+
+
 _edge_voices_cache = []
 
 
@@ -738,6 +839,7 @@ def _item_summary(item):
 
 def start_server():
     init_db()
+    threading.Thread(target=_watch_folder_scanner, daemon=True).start()
     app.run(port=5123, threaded=True, use_reloader=False)
 
 

@@ -11,6 +11,7 @@ import { initSearch, resetSearch } from './search.js';
 import { initBookmarks, loadBookmarks, resetBookmarks } from './bookmarks.js';
 import { initQueue, removeItemById } from './queue.js';
 import { initSleepTimer } from './sleep-timer.js';
+import { initDragDrop } from './drag-drop.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -59,6 +60,7 @@ const onImport = (itemId, autoOpen = true) => {
 };
 initModal({ onImport });
 initDiscover({ onImport });
+initDragDrop({ onImport });
 
 // Generic close affordance: any modal X button closes its backdrop.
 document.querySelectorAll('.modal__close').forEach(btn => {
@@ -98,10 +100,12 @@ connectSSE({
     loadView(state.currentView);
   },
   generation_cancelled: (data) => {
-    // Cancelling generation returns the item to a pending state; it is not deleted.
     if (data.item_id === state.currentItemId) {
       openItem(state.currentItemId);
     }
+    loadView(state.currentView);
+  },
+  watch_folder_import: () => {
     loadView(state.currentView);
   },
 });

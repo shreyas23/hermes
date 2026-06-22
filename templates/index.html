@@ -274,6 +274,18 @@
         <select class="settings-select" id="setting-say-voice"></select>
       </div>
 
+      <div class="settings-group">
+        <label class="settings-label">Watch Folders</label>
+        <p class="settings-hint">New files in watched folders are imported automatically.</p>
+        <div class="watch-folders__list" id="watch-folders-list">
+          <div class="watch-folders__empty">No watch folders</div>
+        </div>
+        <div class="watch-folders__add">
+          <input type="text" class="modal__input watch-folders__input" id="watch-folder-path" placeholder="~/Documents/reading">
+          <button class="modal__submit watch-folders__btn" id="watch-folder-add-btn">Add</button>
+        </div>
+      </div>
+
       <button class="modal__submit" id="settings-save">Save</button>
       <button class="modal__cancel" id="settings-close">Cancel</button>
     </div>
@@ -286,6 +298,18 @@
       <p class="confirm__message" id="confirm-message"></p>
       <button class="modal__submit modal__submit--destructive" id="confirm-ok">Delete</button>
       <button class="modal__cancel" id="confirm-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="drop-overlay" id="drop-overlay">
+    <div class="drop-overlay__content">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>Drop files to import</p>
+      <span>PDF, DOCX, MD, TXT, RTF, HTML</span>
     </div>
   </div>
 

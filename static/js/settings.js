@@ -1,5 +1,6 @@
 import { api } from './api.js';
-import { toastSuccess } from './toast.js';
+import { toastSuccess, toastError } from './toast.js';
+import { escHtml } from './utils.js';
 
 const modal = document.getElementById('settings-modal');
 const engineSelect = document.getElementById('setting-engine');
@@ -14,11 +15,20 @@ const themeIcon = document.getElementById('theme-icon');
 let cachedEdgeVoices = null;
 let cachedSayVoices = null;
 
+const watchList = document.getElementById('watch-folders-list');
+const watchInput = document.getElementById('watch-folder-path');
+const watchAddBtn = document.getElementById('watch-folder-add-btn');
+
 export function initSettings() {
   document.getElementById('btn-settings').addEventListener('click', open);
   document.getElementById('settings-backdrop').addEventListener('click', close);
   document.getElementById('settings-close').addEventListener('click', close);
   document.getElementById('settings-save').addEventListener('click', save);
+
+  watchAddBtn.addEventListener('click', addWatchFolder);
+  watchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') addWatchFolder();
+  });
 
   engineSelect.addEventListener('change', () => {
     const isEdge = engineSelect.value === 'edge';
@@ -48,6 +58,7 @@ function populateSelect(select, voices, labelFn) {
 
 async function open() {
   modal.classList.add('is-visible');
+  loadWatchFolders();
 
   const [settings, edgeVoices, sayVoices] = await Promise.all([
     api('/api/settings'),
@@ -100,4 +111,39 @@ async function save() {
   });
   toastSuccess('Settings saved');
   close();
+}
+
+async function loadWatchFolders() {
+  const data = await api('/api/watch-folders', { showError: false });
+  if (!data.folders) return;
+  watchList.innerHTML = '';
+  if (data.folders.length === 0) {
+    watchList.innerHTML = '<div class="watch-folders__empty">No watch folders</div>';
+    return;
+  }
+  data.folders.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'watch-folder';
+    el.innerHTML = `
+      <span class="watch-folder__path">${escHtml(f.path)}</span>
+      <button class="watch-folder__remove" title="Remove">&times;</button>
+    `;
+    el.querySelector('.watch-folder__remove').addEventListener('click', async () => {
+      await api(`/api/watch-folders/${f.id}`, { method: 'DELETE' });
+      loadWatchFolders();
+    });
+    watchList.appendChild(el);
+  });
+}
+
+async function addWatchFolder() {
+  const path = watchInput.value.trim();
+  if (!path) return;
+  const data = await api('/api/watch-folders', { body: { path }, showError: false });
+  if (data.error) {
+    toastError(data.error);
+    return;
+  }
+  watchInput.value = '';
+  loadWatchFolders();
 }
