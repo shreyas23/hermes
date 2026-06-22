@@ -14,6 +14,8 @@ const state = {
   currentView: 'recent',
   speedIndex: 2,
   scrubbing: false,
+  queue: [],
+  sleepTimerEnd: null,
 };
 
 export { state, SPEED_OPTIONS };

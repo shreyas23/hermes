@@ -40,6 +40,8 @@ Hermes is a **productive information hub**, not just a document reader. The goal
 - `static/js/app.js` — Frontend: init, item opening, SSE events
 - `static/js/reader-highlight.js` — Reader view rendering, sentence highlighting, TOC panel
 - `static/js/player.js` — Audio playback, scrubber, progress saving, media-key (Media Session) integration
+- `static/js/queue.js` — Play queue: add/remove items, auto-advance on track end, queue panel UI
+- `static/js/sleep-timer.js` — Sleep timer: countdown or end-of-item pause, dropdown UI
 - `static/js/search.js` — Find-in-transcript (highlight matches, step through)
 - `static/js/bookmarks.js` — Bookmarks & annotations panel
 - `static/js/discover.js` — Discover modal: Wikipedia search + feed subscriptions
@@ -91,6 +93,8 @@ cd ~/hermes && uv run python app.py
 - Speed control via `audio.playbackRate` (0.5x–2x)
 - Progress saved every 30s, on pause, on stop, on item switch, on window close
 - Global media keys via the Media Session API — macOS routes play/pause/skip to the app (and shows Now Playing) while audio is playing, even when Hermes isn't focused
+- **Play queue** — line up items to play back-to-back. Right-click sidebar items → "Play Next" (inserts at front) or "Add to Queue" (appends). Auto-advances when current item finishes. Queue is ephemeral (session-only, not persisted to DB). Queue panel toggles from the list icon in the controls status bar.
+- **Sleep timer** — auto-pause after a set duration. Options: 15/30/45/60 min or "End of item" (pauses when current track finishes, preventing queue advance). Moon icon in controls status bar; click when active to cancel. Countdown displays next to the icon.
 
 ## Dependencies
 
@@ -128,33 +132,29 @@ Stored in SQLite `settings` table. Key settings:
 
 Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
 
-**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations.
+**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item).
 
-**1. Finish the core loop** — make listen-while-working fully hands-free
-- **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click, auto-advance
-- **Sleep timer** — auto-pause after N minutes
-
-**2. Capture & export** — close the loop on the comprehension tools we just shipped
+**1. Capture & export** — close the loop on the comprehension tools we just shipped
 - **Export highlights** — export stored bookmarks & annotations (Markdown/file); builds directly on the `bookmarks` table
 
-**3. Reduce import friction** — remove the biggest UX papercut for getting content in
+**2. Reduce import friction** — remove the biggest UX papercut for getting content in
 - **Drag-and-drop import** — drop files onto the window to import
 - **Watch folders** — auto-import new files from designated directories
 
-**4. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
+**3. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
 - **Kokoro TTS** — Kokoro-82M runs locally on Apple Silicon with near-cloud quality. Eliminates the need for cloud TTS while keeping everything private. Multiple voices, fast inference via `kokoro-onnx`.
 - **OpenAI TTS** — optional cloud fallback for users who want the highest fidelity and don't mind API calls
 
-**5. Content expansion** — feeds are subscribable today; this makes them proactive
+**4. Content expansion** — feeds are subscribable today; this makes them proactive
 - **Background feed sync** — periodically pull new entries from subscribed feeds into the library (currently entries are fetched on-demand in Discover)
 - **Daily briefing** — auto-queue unread items by priority each morning (depends on play queue)
 
-**6. Reading statistics** — no competitor does this; ElevenReader has zero analytics
+**5. Reading statistics** — no competitor does this; ElevenReader has zero analytics
 - **Stats page** — listening time (daily/weekly/all-time), items completed, streak tracking, average session length
 - **Per-item stats** — time spent, % completed, replay count
 - **Genre/source breakdown** — listening distribution across source types (PDF, article, feed, text) and collections
 
-**7. Polish & export**
+**6. Polish & export**
 - **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
 - **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Auto-tagging** — tag items by topic automatically

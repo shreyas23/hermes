@@ -105,6 +105,16 @@
           <button class="reader__follow" id="btn-follow">&#x2193; Now playing</button>
         </div>
 
+        <div class="queue-panel is-hidden" id="queue-panel">
+          <div class="queue-panel__header">
+            <span>Up Next</span>
+            <button class="queue-panel__clear is-hidden" id="queue-clear">Clear</button>
+          </div>
+          <div class="queue-panel__list" id="queue-list">
+            <div class="queue-panel__empty">Queue is empty</div>
+          </div>
+        </div>
+
         <div class="controls">
           <div class="controls__transport">
             <button class="controls__btn controls__btn--speed" id="btn-speed" title="Playback speed">1x</button>
@@ -124,6 +134,24 @@
           </div>
           <div class="controls__status">
             <span id="status-text"></span>
+            <div class="controls__status-actions">
+              <div class="sleep-timer">
+                <span class="sleep-timer__display" id="sleep-timer-display"></span>
+                <button class="controls__status-btn" id="btn-sleep-timer" title="Sleep timer">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M13.5 8.5a5.5 5.5 0 1 1-7-7 4.5 4.5 0 1 0 7 7z"/>
+                  </svg>
+                </button>
+                <div class="sleep-timer__dropdown is-hidden" id="sleep-timer-dropdown"></div>
+              </div>
+              <button class="controls__status-btn" id="btn-queue" title="Queue" data-count="">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <line x1="2" y1="4" x2="14" y2="4"/>
+                  <line x1="2" y1="8" x2="10" y2="8"/>
+                  <line x1="2" y1="12" x2="12" y2="12"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -4,6 +4,7 @@ import { showContextMenu } from './contextmenu.js';
 import { confirmAction } from './confirm-modal.js';
 import { toastSuccess } from './toast.js';
 import { formatTime, escHtml } from './utils.js';
+import { addToQueue, playNext } from './queue.js';
 
 const itemList = document.getElementById('item-list');
 const collectionsList = document.getElementById('collections-list');
@@ -129,6 +130,12 @@ function renderItemList(items) {
       const actions = [
         { label: 'Open', onClick: () => onItemOpen?.(item.id) },
       ];
+      if (item.audio_ready) {
+        actions.push(
+          { label: 'Play Next', onClick: () => playNext(item) },
+          { label: 'Add to Queue', onClick: () => addToQueue(item) },
+        );
+      }
       if (!item.audio_ready && !item.generating) {
         actions.push({
           label: item.interrupted ? 'Regenerate audio' : 'Generate audio',

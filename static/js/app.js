@@ -2,13 +2,15 @@ import { api, connectSSE } from './api.js';
 import { state } from './state.js';
 import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
 import { initReaderHighlight, renderContent } from './reader-highlight.js';
-import { initPlayer, stop, seekToSentence, prepareControls } from './player.js';
+import { initPlayer, play, pause, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
 import { initDiscover } from './discover.js';
 import { initSettings } from './settings.js';
 import { initConfirm } from './confirm-modal.js';
 import { initSearch, resetSearch } from './search.js';
 import { initBookmarks, loadBookmarks, resetBookmarks } from './bookmarks.js';
+import { initQueue, removeItemById } from './queue.js';
+import { initSleepTimer } from './sleep-timer.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -24,6 +26,7 @@ initSidebar({
     if (state.playingItemId === itemId) {
       stop();
     }
+    removeItemById(itemId);
     if (state.currentItemId === itemId) {
       state.currentItemId = null;
       state.currentItem = null;
@@ -36,6 +39,15 @@ initReaderHighlight((si) => {
   if (state.currentItem?.audio_ready) seekToSentence(si);
 });
 initPlayer();
+initQueue({
+  onPlay: async (itemId) => {
+    await openItem(itemId);
+    if (state.currentItemId === itemId && state.currentItem?.audio_ready) {
+      play();
+    }
+  },
+});
+initSleepTimer({ onExpire: pause });
 initSettings();
 initConfirm();
 initSearch();

@@ -2,6 +2,8 @@ import { api } from './api.js';
 import { state, SPEED_OPTIONS } from './state.js';
 import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } from './reader-highlight.js';
 import { formatTime } from './utils.js';
+import { advanceQueue } from './queue.js';
+import { checkEndOfItem } from './sleep-timer.js';
 
 const btnPlay = document.getElementById('btn-play');
 const btnPause = document.getElementById('btn-pause');
@@ -83,7 +85,7 @@ export function initPlayer() {
     btnSpeed.textContent = speed === 1 ? '1x' : `${speed}x`;
   });
 
-  state.audio.addEventListener('ended', () => {
+  state.audio.addEventListener('ended', async () => {
     state.playing = false;
     syncButtons();
     setPlaybackState('none');
@@ -96,6 +98,8 @@ export function initPlayer() {
     }
     state.playingItemId = null;
     state.playingItem = null;
+    if (checkEndOfItem()) return;
+    await advanceQueue();
   });
 
   state.audio.addEventListener('play', () => {
