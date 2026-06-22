@@ -33,18 +33,23 @@ Hermes is a **productive information hub**, not just a document reader. The goal
 ## Key files
 
 - `app.py` — Flask routes + PyWebView entry point
-- `models.py` — SQLite schema and queries (items, progress, collections)
+- `models.py` — SQLite schema and queries (items, progress, collections, feeds, bookmarks)
 - `audio.py` — TTS generation, WAV concatenation, caching
-- `extractors.py` — Text extraction (PDF via pymupdf4llm, DOCX via python-docx, HTML via bs4, RTF via striprtf, MD/TXT built-in)
+- `extractors.py` — Text extraction (PDF via pymupdf4llm, DOCX via python-docx, HTML via bs4, RTF via striprtf, MD/TXT built-in); Wikipedia citation/appendix stripping
+- `discovery.py` — Article discovery: Wikipedia search + RSS/Atom feed aggregation
 - `static/js/app.js` — Frontend: init, item opening, SSE events
 - `static/js/reader-highlight.js` — Reader view rendering, sentence highlighting, TOC panel
-- `static/js/player.js` — Audio playback, scrubber, progress saving
+- `static/js/player.js` — Audio playback, scrubber, progress saving, media-key (Media Session) integration
+- `static/js/search.js` — Find-in-transcript (highlight matches, step through)
+- `static/js/bookmarks.js` — Bookmarks & annotations panel
+- `static/js/discover.js` — Discover modal: Wikipedia search + feed subscriptions
 - `static/js/sidebar.js` — Library sidebar, item list, navigation
+- `static/js/settings.js` — Settings modal logic, design/theme switching
+- `static/js/confirm-modal.js` — Reusable promise-based confirmation modal
 - `static/css/tokens.css` — Design tokens (colors, spacing, typography, glass tokens, accent glows)
 - `static/css/layout.css` — App shell layout (sidebar, main area)
-- `static/css/components.css` — Component styles (reader, controls, TOC, tables)
-- `static/css/designs.css` — Design variant overrides (Aurora, Ink & Paper); Glass is the default in tokens.css
-- `static/js/settings.js` — Settings modal logic, design/theme switching
+- `static/css/components.css` — Component styles (reader, controls, TOC, tables, discover, bookmarks, search)
+- `static/css/designs.css` — Design variant overrides (Glass, Soft Aurora); glass tokens are the base in tokens.css, `ink` is the default design
 - `templates/index.html` — Main HTML layout
 
 ## Storage layout
@@ -59,7 +64,7 @@ All user data lives under `~/hermes-library/`:
       master.wav            # Concatenated audio (22050Hz mono 16-bit PCM)
 ```
 
-- **library.db** — contains item metadata (title, source_type, source_url, original_path), extracted text content, sentence arrays (JSON), timeline mappings (JSON), playback progress, collection membership, reader_html (structured HTML for PDFs/articles), and toc (JSON table of contents for PDFs).
+- **library.db** — contains item metadata (title, source_type, source_url, original_path), extracted text content, sentence arrays (JSON), timeline mappings (JSON), playback progress, collection membership, reader_html (structured HTML for PDFs/articles), toc (JSON table of contents for PDFs), feed subscriptions, and bookmarks/annotations (per-item, by sentence index).
 - **audio/<item_id>/master.wav** — cached TTS audio for each item. Generated once on import, ~150MB per hour of content. During generation, temporary per-sentence WAVs (`sent_0000.wav`, etc.) are created in the same directory and deleted after concatenation.
 - Original files are NOT copied into the library — only extracted text is stored in the database.
 
@@ -85,6 +90,7 @@ cd ~/hermes && uv run python app.py
 - Teleprompter syncs via sentence→timestamp mapping stored in the timeline
 - Speed control via `audio.playbackRate` (0.5x–2x)
 - Progress saved every 30s, on pause, on stop, on item switch, on window close
+- Global media keys via the Media Session API — macOS routes play/pause/skip to the app (and shows Now Playing) while audio is playing, even when Hermes isn't focused
 
 ## Dependencies
 
@@ -122,30 +128,32 @@ Stored in SQLite `settings` table. Key settings:
 
 Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
 
-**1. Complete the core loop** — make listen-while-working actually work hands-free
+**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations.
+
+**1. Finish the core loop** — make listen-while-working fully hands-free
 - **Play queue** — line up multiple items to play back-to-back, "Play Next" via right-click, auto-advance
-- **Global media key support** — macOS media keys (play/pause, skip) control Hermes without switching windows
 - **Sleep timer** — auto-pause after N minutes
 
-**2. Reduce import friction** — remove the biggest UX papercut for getting content in
+**2. Capture & export** — close the loop on the comprehension tools we just shipped
+- **Export highlights** — export stored bookmarks & annotations (Markdown/file); builds directly on the `bookmarks` table
+
+**3. Reduce import friction** — remove the biggest UX papercut for getting content in
 - **Drag-and-drop import** — drop files onto the window to import
 - **Watch folders** — auto-import new files from designated directories
-
-**3. In-session comprehension** — make the teleprompter useful beyond passive listening
-- **Search within transcript** — find text in the current item's teleprompter view
-- **Bookmarks & annotations** — mark and annotate passages while listening
-- **Export highlights** — export annotated passages
 
 **4. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
 - **Alternative TTS engines** — Edge TTS or OpenAI TTS for higher-quality voices
 
-**5. Content expansion** — only after the core experience is solid
-- **RSS feed subscriptions** — subscribe to feeds, auto-import new articles
-- **Live news feeds** — aggregate news sources into the listening queue
+**5. Content expansion** — feeds are subscribable today; this makes them proactive
+- **Background feed sync** — periodically pull new entries from subscribed feeds into the library (currently entries are fetched on-demand in Discover)
 - **Daily briefing** — auto-queue unread items by priority each morning (depends on play queue)
 
-**6. Polish & export**
-- **Mini player mode** — compact floating strip (title + play/pause + progress) over other apps
+**6. Reading statistics** — no competitor does this; ElevenReader has zero analytics
+- **Stats page** — listening time (daily/weekly/all-time), items completed, streak tracking, average session length
+- **Per-item stats** — time spent, % completed, replay count
+- **Genre/source breakdown** — listening distribution across source types (PDF, article, feed, text) and collections
+
+**7. Polish & export**
 - **Inline images in transcript** — display images from articles/PDFs/DOCX in the teleprompter view, positioned between sentences where they appeared in the original. Caption/alt-text reading as a follow-on.
 - **PDF table improvements** — pymupdf4llm splits multi-line PDF cells into extra rows/columns; current post-processing merges them but results are imperfect. `pdf_tables` setting defaults to `off` until quality improves.
 - **Auto-tagging** — tag items by topic automatically
