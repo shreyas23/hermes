@@ -358,6 +358,7 @@ def delete_feed(feed_id):
 
 
 DEFAULTS = {
+    'design': 'ink',  # default UI design — single source of truth (templated into index.html + served via /api/settings)
     'tts_engine': 'edge',
     'edge_voice': 'en-US-AriaNeural',
     'say_voice': 'Samantha',  # Download Siri voices from System Settings > Accessibility > Spoken Content

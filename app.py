@@ -43,7 +43,8 @@ def broadcast_sse(event: str, data: dict):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # default_design comes from the central config (models.DEFAULTS) unless overridden in settings
+    return render_template('index.html', default_design=get_setting('design'))
 
 
 # --- Library endpoints ---

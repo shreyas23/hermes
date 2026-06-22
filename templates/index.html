@@ -9,7 +9,8 @@
     const t = localStorage.getItem('hermes-theme')
       || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', t);
-    const d = localStorage.getItem('hermes-design') || 'glass';
+    window.__DEFAULT_DESIGN = '{{ default_design }}';
+    const d = localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
     document.documentElement.setAttribute('data-design', d);
   </script>
   <link rel="stylesheet" href="/static/css/layout.css">
