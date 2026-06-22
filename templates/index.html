@@ -74,6 +74,33 @@
             </svg>
           </button>
           <div class="reader__toc is-hidden" id="reader-toc"></div>
+
+          <button class="reader__search-btn" id="btn-search" title="Search transcript (⌘F)">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/>
+            </svg>
+          </button>
+          <div class="reader__search is-hidden" id="reader-search">
+            <input type="text" class="reader__search-input" id="reader-search-input" placeholder="Search transcript…">
+            <span class="reader__search-count" id="reader-search-count"></span>
+            <button class="reader__search-nav" id="reader-search-prev" title="Previous match">&#x2191;</button>
+            <button class="reader__search-nav" id="reader-search-next" title="Next match">&#x2193;</button>
+            <button class="reader__search-nav" id="reader-search-close" title="Close">&times;</button>
+          </div>
+
+          <button class="reader__bookmarks-btn" id="btn-bookmarks" title="Bookmarks &amp; notes">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+              <path d="M4 2.5h8v11l-4-3-4 3z"/>
+            </svg>
+          </button>
+          <div class="reader__bookmarks is-hidden" id="reader-bookmarks">
+            <div class="reader__bookmarks-header">
+              <span>Bookmarks &amp; notes</span>
+              <button class="reader__bookmarks-add" id="bookmark-add">+ Add</button>
+            </div>
+            <div class="reader__bookmarks-list" id="bookmark-list"></div>
+          </div>
+
           <div class="reader__scroll" id="reader-content"></div>
           <button class="reader__follow" id="btn-follow">&#x2193; Now playing</button>
         </div>

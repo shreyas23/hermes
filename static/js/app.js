@@ -7,6 +7,8 @@ import { initModal } from './modal.js';
 import { initDiscover } from './discover.js';
 import { initSettings } from './settings.js';
 import { initConfirm } from './confirm-modal.js';
+import { initSearch, resetSearch } from './search.js';
+import { initBookmarks, loadBookmarks, resetBookmarks } from './bookmarks.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -36,6 +38,8 @@ initReaderHighlight((si) => {
 initPlayer();
 initSettings();
 initConfirm();
+initSearch();
+initBookmarks({ onJump: seekToSentence });
 
 const onImport = (itemId, autoOpen = true) => {
   loadView(state.currentView);
@@ -109,6 +113,9 @@ async function openItem(itemId) {
   // The reader is always shown so text is readable before (or without) audio.
   showView('player');
   renderContent(item);
+  resetSearch();
+  resetBookmarks();
+  loadBookmarks(item.id);
 
   const isPlaying = itemId === state.playingItemId;
 

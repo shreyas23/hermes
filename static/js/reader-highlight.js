@@ -11,6 +11,7 @@ let programmaticScroll = false;
 let userScrollTimeout = null;
 let lastHighlightedIndex = -1;
 let sentenceElements = [];
+let selectedSentenceIndex = 0;
 
 export function initReaderHighlight(onSentenceClick) {
   container.addEventListener('scroll', () => {
@@ -28,12 +29,12 @@ export function initReaderHighlight(onSentenceClick) {
     scrollToActive();
   });
 
-  if (onSentenceClick) {
-    container.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-si]');
-      if (el) onSentenceClick(parseInt(el.dataset.si));
-    });
-  }
+  container.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-si]');
+    if (!el) return;
+    selectedSentenceIndex = parseInt(el.dataset.si);
+    if (onSentenceClick) onSentenceClick(selectedSentenceIndex);
+  });
 
   tocBtn.addEventListener('click', () => {
     const open = tocPanel.classList.toggle('is-hidden');
@@ -45,6 +46,7 @@ export function renderContent(item) {
   container.innerHTML = '';
   sentenceElements = [];
   lastHighlightedIndex = -1;
+  selectedSentenceIndex = 0;
   autoFollow = true;
   followBtn.classList.remove('is-visible');
 
@@ -111,6 +113,25 @@ export function getCurrentSentenceIndex() {
 export function clearHighlights() {
   lastHighlightedIndex = -1;
   container.querySelectorAll('.is-reading').forEach(el => el.classList.remove('is-reading'));
+}
+
+// The passage a bookmark/annotation should target: the sentence being read when
+// audio is loaded for this item, otherwise the last sentence the user clicked.
+export function getActiveSentenceIndex() {
+  if (state.currentItemId === state.playingItemId && state.timeline.length) {
+    return getCurrentSentenceIndex();
+  }
+  return selectedSentenceIndex;
+}
+
+// Scroll a sentence into view and briefly flash it (used for bookmark jumps
+// when there is no audio to seek).
+export function scrollToSentence(index) {
+  const el = sentenceElements[index];
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('is-flash');
+  setTimeout(() => el.classList.remove('is-flash'), 1200);
 }
 
 export function highlightCurrentSentence() {

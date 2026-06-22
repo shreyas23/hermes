@@ -87,6 +87,8 @@
   /* Layout */
   --sidebar-width: 260px;
   --play-btn-size: 44px;
+  --reader-btn-size: 32px;
+  --bookmarks-panel-width: 300px;
   --modal-width: 480px;
   --modal-width-wide: 600px;
   --modal-width-narrow: 400px;
