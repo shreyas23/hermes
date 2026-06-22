@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { execSync, spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const PORT = 5199;
+const PORT = 5196;
 const BASE = `http://127.0.0.1:${PORT}`;
 const DIR = 'e2e/screenshots';
 

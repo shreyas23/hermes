@@ -12,6 +12,7 @@ from audio import cancel_generation, generate_audio_background, is_generating
 from discovery import fetch_entries, load_feed, search_wikipedia
 from extractors import (
     SUPPORTED_EXTENSIONS,
+    _is_safe_url,
     clean_html_for_reader,
     extract_with_images,
     inject_sentence_spans,
@@ -261,6 +262,9 @@ def import_url():
 
     import tempfile
     import urllib.request
+
+    if not _is_safe_url(url):
+        return jsonify({"error": "URL blocked: private or internal address"}), 400
 
     MAX_DOWNLOAD = 50 * 1024 * 1024
     try:

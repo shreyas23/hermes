@@ -3,7 +3,8 @@
   "private": true,
   "description": "E2E testing utilities for Hermes",
   "scripts": {
-    "e2e": "node e2e/screenshot.mjs"
+    "e2e": "node e2e/screenshot.mjs",
+    "e2e:all": "node e2e/bookmarks.mjs && node e2e/search.mjs && node e2e/media-keys.mjs && node e2e/discover.mjs && node e2e/queue-timer.mjs && node e2e/import.mjs && node e2e/collections.mjs && node e2e/screenshot.mjs"
   },
   "repository": {
     "type": "git",
