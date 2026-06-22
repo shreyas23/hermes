@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { toastSuccess } from './toast.js';
+import { formatTime } from './utils.js';
 
 let onTimerExpire = null;
 let countdownInterval = null;
@@ -72,7 +73,7 @@ function startTimer(minutes) {
   }, 1000);
 }
 
-export function cancelTimer() {
+function cancelTimer() {
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
@@ -85,9 +86,7 @@ export function cancelTimer() {
 function updateDisplay() {
   if (!state.sleepTimerEnd || state.sleepTimerEnd === 'end-of-item') return;
   const remaining = Math.max(0, state.sleepTimerEnd - Date.now());
-  const min = Math.floor(remaining / 60000);
-  const sec = Math.floor((remaining % 60000) / 1000);
-  display.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+  display.textContent = formatTime(remaining);
 }
 
 export function checkEndOfItem() {

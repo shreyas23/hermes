@@ -14,16 +14,14 @@ export function initQueue({ onPlay }) {
   btnQueue.addEventListener('click', togglePanel);
   btnClear.addEventListener('click', () => {
     state.queue = [];
-    render();
-    updateBadge();
+    sync();
   });
 }
 
 export function addToQueue(item) {
   if (state.queue.some(q => q.id === item.id)) return;
   state.queue.push(pick(item));
-  render();
-  updateBadge();
+  sync();
   toastSuccess('Added to queue');
 }
 
@@ -31,33 +29,34 @@ export function playNext(item) {
   const existing = state.queue.findIndex(q => q.id === item.id);
   if (existing !== -1) state.queue.splice(existing, 1);
   state.queue.unshift(pick(item));
-  render();
-  updateBadge();
+  sync();
   toastSuccess('Playing next');
 }
 
-export function removeFromQueue(index) {
+function removeFromQueue(index) {
   state.queue.splice(index, 1);
-  render();
-  updateBadge();
+  sync();
 }
 
 export function removeItemById(itemId) {
   const idx = state.queue.findIndex(q => q.id === itemId);
   if (idx !== -1) {
     state.queue.splice(idx, 1);
-    render();
-    updateBadge();
+    sync();
   }
 }
 
 export async function advanceQueue() {
   if (state.queue.length === 0) return false;
   const next = state.queue.shift();
-  render();
-  updateBadge();
+  sync();
   if (onPlayQueueItem) await onPlayQueueItem(next.id);
   return true;
+}
+
+function sync() {
+  render();
+  updateBadge();
 }
 
 function togglePanel() {
