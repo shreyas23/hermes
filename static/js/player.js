@@ -16,9 +16,39 @@ const timeTotal = document.getElementById('time-total');
 const statusText = document.getElementById('status-text');
 let canplayAbort = null;
 
+// --- Global media keys (macOS routes them here via the Media Session API
+// while audio is playing, even when Hermes isn't focused) ---
+function setupMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+  const handlers = {
+    play,
+    pause,
+    previoustrack: () => btnPrev.click(),
+    nexttrack: () => btnNext.click(),
+    seekbackward: () => btnBack15.click(),
+    seekforward: () => btnFwd15.click(),
+  };
+  const registered = [];
+  for (const [action, fn] of Object.entries(handlers)) {
+    try { ms.setActionHandler(action, fn); registered.push(action); } catch { /* unsupported action */ }
+  }
+  window.__mediaSessionActions = registered; // test seam
+}
+
+function updateMediaMetadata(item) {
+  if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
+  navigator.mediaSession.metadata = new MediaMetadata({ title: item.title, artist: 'Hermes' });
+}
+
+function setPlaybackState(playbackState) {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playbackState;
+}
+
 export function initPlayer() {
   btnPlay.addEventListener('click', play);
   btnPause.addEventListener('click', pause);
+  setupMediaSession();
 
   btnPrev.addEventListener('click', () => {
     const idx = getCurrentSentenceIndex();
@@ -56,6 +86,7 @@ export function initPlayer() {
   state.audio.addEventListener('ended', () => {
     state.playing = false;
     syncButtons();
+    setPlaybackState('none');
     stopTick();
     stopProgressSave();
     if (state.playingItemId) {
@@ -140,6 +171,7 @@ export function loadAudio(item) {
   state.audio.src = `/api/library/${item.id}/audio`;
   state.audio.playbackRate = SPEED_OPTIONS[state.speedIndex];
   state.audio.load();
+  updateMediaMetadata(item);
 
   if (item.progress && item.progress.current_time_ms > 0 && !item.progress.is_finished) {
     const resumeMs = item.progress.current_time_ms;
@@ -165,6 +197,7 @@ export function play() {
   state.audio.play();
   state.playing = true;
   syncButtons();
+  setPlaybackState('playing');
   startTick();
   startProgressSave();
 }
@@ -173,6 +206,7 @@ export function pause() {
   state.audio.pause();
   state.playing = false;
   syncButtons();
+  setPlaybackState('paused');
   stopTick();
   stopProgressSave();
   saveProgress();
@@ -183,6 +217,7 @@ export function stop() {
   state.audio.currentTime = 0;
   state.playing = false;
   syncButtons();
+  setPlaybackState('none');
   stopTick();
   stopProgressSave();
   scrubber.value = 0;
@@ -209,6 +244,7 @@ export function seekToSentence(index) {
       state.audio.play();
       state.playing = true;
       syncButtons();
+      setPlaybackState('playing');
       startTick();
       startProgressSave();
     }
