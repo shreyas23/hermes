@@ -28,6 +28,11 @@ export function initModal({ onImport }) {
   document.getElementById('import-folder-scan-btn').addEventListener('click', scanFolder);
   document.getElementById('import-text-btn').addEventListener('click', importText);
 
+  document.getElementById('watch-folder-add-btn').addEventListener('click', addWatchFolder);
+  document.getElementById('watch-folder-path').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addWatchFolder();
+  });
+
   document.addEventListener('keydown', e => {
     if (e.code === 'Escape') {
       if (backdrop.classList.contains('is-visible')) close();
@@ -39,6 +44,7 @@ export function initModal({ onImport }) {
 
 function open() {
   backdrop.classList.add('is-visible');
+  loadWatchFolders();
 }
 
 function close() {
@@ -117,4 +123,41 @@ async function importText() {
   document.getElementById('import-text-content').value = '';
   close();
   onImported?.(data.item_id);
+}
+
+async function loadWatchFolders() {
+  const list = document.getElementById('watch-folders-list');
+  const data = await api('/api/watch-folders', { showError: false });
+  if (!data.folders) return;
+  list.innerHTML = '';
+  if (data.folders.length === 0) {
+    list.innerHTML = '<div class="watch-folders__empty">No watch folders</div>';
+    return;
+  }
+  data.folders.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'watch-folder';
+    el.innerHTML = `
+      <span class="watch-folder__path">${escHtml(f.path)}</span>
+      <button class="watch-folder__remove" title="Remove">&times;</button>
+    `;
+    el.querySelector('.watch-folder__remove').addEventListener('click', async () => {
+      await api(`/api/watch-folders/${f.id}`, { method: 'DELETE' });
+      loadWatchFolders();
+    });
+    list.appendChild(el);
+  });
+}
+
+async function addWatchFolder() {
+  const input = document.getElementById('watch-folder-path');
+  const path = input.value.trim();
+  if (!path) return;
+  const data = await api('/api/watch-folders', { body: { path }, showError: false });
+  if (data.error) {
+    toastError(data.error);
+    return;
+  }
+  input.value = '';
+  loadWatchFolders();
 }

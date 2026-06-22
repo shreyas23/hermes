@@ -1,6 +1,5 @@
 import { api } from './api.js';
-import { toastSuccess, toastError } from './toast.js';
-import { escHtml } from './utils.js';
+import { toastSuccess } from './toast.js';
 
 const modal = document.getElementById('settings-modal');
 const engineSelect = document.getElementById('setting-engine');
@@ -31,20 +30,11 @@ function updateVoiceGroups(engine) {
   piperGroup.classList.toggle('is-hidden', engine !== 'piper');
 }
 
-const watchList = document.getElementById('watch-folders-list');
-const watchInput = document.getElementById('watch-folder-path');
-const watchAddBtn = document.getElementById('watch-folder-add-btn');
-
 export function initSettings() {
   document.getElementById('btn-settings').addEventListener('click', open);
   document.getElementById('settings-backdrop').addEventListener('click', close);
   document.getElementById('settings-close').addEventListener('click', close);
   document.getElementById('settings-save').addEventListener('click', save);
-
-  watchAddBtn.addEventListener('click', addWatchFolder);
-  watchInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') addWatchFolder();
-  });
 
   engineSelect.addEventListener('change', () => updateVoiceGroups(engineSelect.value));
 
@@ -70,7 +60,8 @@ function populateSelect(select, voices, labelFn) {
 
 async function open() {
   modal.classList.add('is-visible');
-  loadWatchFolders();
+  loadStats();
+  loadCache();
 
   const [settings, edgeVoices, sayVoices, kokoroVoices, piperVoices] = await Promise.all([
     api('/api/settings'),
@@ -139,37 +130,73 @@ async function save() {
   close();
 }
 
-async function loadWatchFolders() {
-  const data = await api('/api/watch-folders', { showError: false });
-  if (!data.folders) return;
-  watchList.innerHTML = '';
-  if (data.folders.length === 0) {
-    watchList.innerHTML = '<div class="watch-folders__empty">No watch folders</div>';
-    return;
-  }
-  data.folders.forEach(f => {
-    const el = document.createElement('div');
-    el.className = 'watch-folder';
-    el.innerHTML = `
-      <span class="watch-folder__path">${escHtml(f.path)}</span>
-      <button class="watch-folder__remove" title="Remove">&times;</button>
-    `;
-    el.querySelector('.watch-folder__remove').addEventListener('click', async () => {
-      await api(`/api/watch-folders/${f.id}`, { method: 'DELETE' });
-      loadWatchFolders();
-    });
-    watchList.appendChild(el);
-  });
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
-async function addWatchFolder() {
-  const path = watchInput.value.trim();
-  if (!path) return;
-  const data = await api('/api/watch-folders', { body: { path }, showError: false });
-  if (data.error) {
-    toastError(data.error);
-    return;
-  }
-  watchInput.value = '';
-  loadWatchFolders();
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+async function loadStats() {
+  const el = document.getElementById('settings-stats');
+  const data = await api('/api/stats', { showError: false });
+  if (!data || data.error) { el.innerHTML = '<div class="settings-stats__loading">Unavailable</div>'; return; }
+
+  el.innerHTML = `
+    <div class="settings-stat"><span>Library items</span><span class="settings-stat__value">${data.items}</span></div>
+    <div class="settings-stat"><span>With audio</span><span class="settings-stat__value">${data.audio_items}</span></div>
+    <div class="settings-stat"><span>Total audio</span><span class="settings-stat__value">${formatDuration(data.total_duration_ms)}</span></div>
+    <div class="settings-stat"><span>Bookmarks</span><span class="settings-stat__value">${data.bookmarks}</span></div>
+    <div class="settings-stat"><span>Feeds</span><span class="settings-stat__value">${data.feeds}</span></div>
+    <div class="settings-stat"><span>Collections</span><span class="settings-stat__value">${data.collections}</span></div>
+  `;
+}
+
+async function loadCache() {
+  const el = document.getElementById('settings-cache');
+  const data = await api('/api/stats', { showError: false });
+  if (!data || data.error) { el.innerHTML = '<div class="settings-stats__loading">Unavailable</div>'; return; }
+
+  el.innerHTML = `
+    <div class="settings-cache__row">
+      <div class="settings-cache__info">
+        <span class="settings-cache__label">Audio cache</span>
+        <span class="settings-cache__size">${formatBytes(data.audio_cache_bytes)}</span>
+      </div>
+    </div>
+    <div class="settings-cache__row">
+      <div class="settings-cache__info">
+        <span class="settings-cache__label">TTS models</span>
+        <span class="settings-cache__size">${formatBytes(data.models_cache_bytes)}</span>
+      </div>
+      <button class="settings-cache__btn" data-target="models">Clear</button>
+    </div>
+    <div class="settings-cache__row">
+      <div class="settings-cache__info">
+        <span class="settings-cache__label">HuggingFace cache</span>
+        <span class="settings-cache__size">${formatBytes(data.hf_cache_bytes)}</span>
+      </div>
+      <button class="settings-cache__btn" data-target="hf">Clear</button>
+    </div>
+  `;
+
+  el.querySelectorAll('.settings-cache__btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const target = btn.dataset.target;
+      btn.textContent = '...';
+      await api('/api/cache/clear', { body: { target } });
+      toastSuccess(`${target === 'hf' ? 'HuggingFace' : 'Model'} cache cleared`);
+      loadCache();
+    });
+  });
 }

@@ -20,6 +20,7 @@ from extractors import (
     map_images_to_sentences,
 )
 from models import (
+    LIBRARY_DIR,
     add_bookmark,
     add_feed,
     add_item,
@@ -672,6 +673,78 @@ def voices_list():
 
     engine = request.args.get("engine", "edge")
     return jsonify({"voices": get_engine(engine).list_voices()})
+
+
+# --- Stats & cache ---
+
+
+@app.route("/api/stats", methods=["GET"])
+def stats():
+    from models import AUDIO_DIR, get_db
+
+    with get_db() as db:
+        items = db.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        audio_items = db.execute("SELECT COUNT(*) FROM items WHERE audio_ready = 1").fetchone()[0]
+        dur_ms = db.execute("SELECT COALESCE(SUM(total_duration_ms), 0) FROM items WHERE audio_ready = 1").fetchone()[0]
+        bookmarks = db.execute("SELECT COUNT(*) FROM bookmarks").fetchone()[0]
+        feeds = db.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+        collections = db.execute("SELECT COUNT(*) FROM collections").fetchone()[0]
+
+    audio_bytes = _dir_size(AUDIO_DIR)
+    models_dir = os.path.join(LIBRARY_DIR, "models")
+    models_bytes = _dir_size(models_dir)
+    hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
+    hf_bytes = _dir_size(hf_cache)
+
+    return jsonify(
+        {
+            "items": items,
+            "audio_items": audio_items,
+            "total_duration_ms": dur_ms,
+            "bookmarks": bookmarks,
+            "feeds": feeds,
+            "collections": collections,
+            "audio_cache_bytes": audio_bytes,
+            "models_cache_bytes": models_bytes,
+            "hf_cache_bytes": hf_bytes,
+        }
+    )
+
+
+@app.route("/api/cache/clear", methods=["POST"])
+def cache_clear():
+    import shutil
+
+    data = request.json or {}
+    target = data.get("target")
+    models_dir = os.path.join(LIBRARY_DIR, "models")
+    hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
+
+    if target == "models":
+        if os.path.isdir(models_dir):
+            shutil.rmtree(models_dir)
+            os.makedirs(models_dir, exist_ok=True)
+        return jsonify({"cleared": "models"})
+    elif target == "hf":
+        if os.path.isdir(hf_cache):
+            shutil.rmtree(hf_cache)
+        return jsonify({"cleared": "hf"})
+    else:
+        return jsonify({"error": "Unknown target"}), 400
+
+
+def _dir_size(path):
+    total = 0
+    if not os.path.isdir(path):
+        return 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            try:
+                total += os.path.getsize(fp)
+            except OSError:
+                pass
+    return total
 
 
 # --- SSE ---

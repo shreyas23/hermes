@@ -189,6 +189,7 @@
         <button class="modal__tab" data-tab="file">File</button>
         <button class="modal__tab" data-tab="folder">Folder</button>
         <button class="modal__tab" data-tab="text">Text</button>
+        <button class="modal__tab" data-tab="watch">Watch</button>
       </div>
 
       <div class="modal__pane is-active" id="pane-url">
@@ -211,6 +212,17 @@
         <input type="text" class="modal__input" id="import-text-title" placeholder="Title">
         <textarea class="modal__input modal__input--textarea" id="import-text-content" placeholder="Paste your text here..."></textarea>
         <button class="modal__submit" id="import-text-btn">Import Text</button>
+      </div>
+
+      <div class="modal__pane" id="pane-watch">
+        <p class="settings-hint">New files in watched folders are imported automatically.</p>
+        <div class="watch-folders__list" id="watch-folders-list">
+          <div class="watch-folders__empty">No watch folders</div>
+        </div>
+        <div class="watch-folders__add">
+          <input type="text" class="modal__input watch-folders__input" id="watch-folder-path" placeholder="~/Documents/reading">
+          <button class="modal__submit watch-folders__btn" id="watch-folder-add-btn">Add</button>
+        </div>
       </div>
 
       <button class="modal__cancel" id="import-close">Cancel</button>
@@ -258,61 +270,75 @@
       <button class="modal__close" title="Close" aria-label="Close">&times;</button>
       <h2 class="modal__title">Settings</h2>
 
-      <div class="settings-group">
-        <label class="settings-label" for="setting-design">Design</label>
-        <select class="settings-select" id="setting-design">
-          <option value="glass">Glass</option>
-          <option value="aurora">Soft Aurora</option>
-          <option value="ink">Ink &amp; Paper</option>
-        </select>
-      </div>
+      <!-- Appearance -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Appearance</h3>
 
-      <div class="settings-group">
-        <label class="settings-label" for="setting-engine">TTS Engine</label>
-        <select class="settings-select" id="setting-engine">
-          <option value="edge">Edge TTS (online, faster)</option>
-          <option value="say">macOS Say (offline)</option>
-          <option value="kokoro">Kokoro (local, CPU)</option>
-          <option value="kokoro-mlx">Kokoro MLX (local, GPU)</option>
-          <option value="piper">Piper (local, fast)</option>
-        </select>
-      </div>
-
-      <div class="settings-group" id="edge-voice-group">
-        <label class="settings-label" for="setting-edge-voice">Edge Voice</label>
-        <select class="settings-select" id="setting-edge-voice"></select>
-      </div>
-
-      <div class="settings-group is-hidden" id="say-voice-group">
-        <label class="settings-label" for="setting-say-voice">macOS Voice</label>
-        <select class="settings-select" id="setting-say-voice"></select>
-      </div>
-
-      <div class="settings-group">
-        <label class="settings-label">Watch Folders</label>
-        <p class="settings-hint">New files in watched folders are imported automatically.</p>
-        <div class="watch-folders__list" id="watch-folders-list">
-          <div class="watch-folders__empty">No watch folders</div>
-        </div>
-        <div class="watch-folders__add">
-          <input type="text" class="modal__input watch-folders__input" id="watch-folder-path" placeholder="~/Documents/reading">
-          <button class="modal__submit watch-folders__btn" id="watch-folder-add-btn">Add</button>
+        <div class="settings-group">
+          <label class="settings-label" for="setting-design">Design</label>
+          <select class="settings-select" id="setting-design">
+            <option value="glass">Glass</option>
+            <option value="aurora">Soft Aurora</option>
+            <option value="ink">Ink &amp; Paper</option>
+          </select>
         </div>
       </div>
 
-      <div class="settings-group is-hidden" id="kokoro-voice-group">
-        <label class="settings-label" for="setting-kokoro-voice">Kokoro Voice</label>
-        <select class="settings-select" id="setting-kokoro-voice"></select>
+      <!-- TTS -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Text-to-Speech</h3>
+
+        <div class="settings-group">
+          <label class="settings-label" for="setting-engine">Default Engine</label>
+          <select class="settings-select" id="setting-engine">
+            <option value="edge">Edge TTS (online, faster)</option>
+            <option value="say">macOS Say (offline)</option>
+            <option value="kokoro">Kokoro (local, CPU)</option>
+            <option value="kokoro-mlx">Kokoro MLX (local, GPU)</option>
+            <option value="piper">Piper (local, fast)</option>
+          </select>
+        </div>
+
+        <div class="settings-group" id="edge-voice-group">
+          <label class="settings-label" for="setting-edge-voice">Edge Voice</label>
+          <select class="settings-select" id="setting-edge-voice"></select>
+        </div>
+
+        <div class="settings-group is-hidden" id="say-voice-group">
+          <label class="settings-label" for="setting-say-voice">macOS Voice</label>
+          <select class="settings-select" id="setting-say-voice"></select>
+        </div>
+
+        <div class="settings-group is-hidden" id="kokoro-voice-group">
+          <label class="settings-label" for="setting-kokoro-voice">Kokoro Voice</label>
+          <select class="settings-select" id="setting-kokoro-voice"></select>
+        </div>
+
+        <div class="settings-group is-hidden" id="kokoro-mlx-voice-group">
+          <label class="settings-label" for="setting-kokoro-mlx-voice">Kokoro MLX Voice</label>
+          <select class="settings-select" id="setting-kokoro-mlx-voice"></select>
+        </div>
+
+        <div class="settings-group is-hidden" id="piper-voice-group">
+          <label class="settings-label" for="setting-piper-voice">Piper Voice</label>
+          <select class="settings-select" id="setting-piper-voice"></select>
+        </div>
       </div>
 
-      <div class="settings-group is-hidden" id="kokoro-mlx-voice-group">
-        <label class="settings-label" for="setting-kokoro-mlx-voice">Kokoro MLX Voice</label>
-        <select class="settings-select" id="setting-kokoro-mlx-voice"></select>
+      <!-- Statistics -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Statistics</h3>
+        <div class="settings-stats" id="settings-stats">
+          <div class="settings-stats__loading">Loading...</div>
+        </div>
       </div>
 
-      <div class="settings-group is-hidden" id="piper-voice-group">
-        <label class="settings-label" for="setting-piper-voice">Piper Voice</label>
-        <select class="settings-select" id="setting-piper-voice"></select>
+      <!-- Cache -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Storage</h3>
+        <div class="settings-cache" id="settings-cache">
+          <div class="settings-stats__loading">Loading...</div>
+        </div>
       </div>
 
       <button class="modal__submit" id="settings-save">Save</button>
