@@ -617,6 +617,8 @@ def _extract_txt(path: str, image_dir: str = None) -> dict:
 
 
 def _extract_md(path: str, image_dir: str = None) -> dict:
+    import markdown as md_lib
+
     with open(path, "r", errors="ignore") as f:
         text = f.read()
 
@@ -645,17 +647,41 @@ def _extract_md(path: str, image_dir: str = None) -> dict:
                     }
                 )
 
-    text = re.sub(r"```[\s\S]*?```", "", text)
-    text = re.sub(r"`[^`]+`", "", text)
-    text = re.sub(r"!\[.*?\]\(.*?\)", "", text)
-    text = re.sub(r"\[([^\]]+)\]\(.*?\)", r"\1", text)
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"[*_]{1,3}([^*_]+)[*_]{1,3}", r"\1", text)
-    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\s*>\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return {"text": text.strip(), "images": images}
+    md = md_lib.Markdown(extensions=["extra", "toc"])
+    html = md.convert(text)
+    reader_html, toc = _normalize_reader_headings(html)
+
+    return {"text": _html_to_plain_text(reader_html), "images": images, "reader_html": reader_html, "toc": toc}
+
+
+def _normalize_reader_headings(html):
+    """Rewrite heading ids to the h-N convention and return (html, toc)."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    toc = []
+    counter = 0
+    for h in soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
+        counter += 1
+        hid = f"h-{counter}"
+        h["id"] = hid
+        title = h.get_text().strip()
+        if title:
+            toc.append({"level": min(int(h.name[1]), 3), "title": title, "id": hid})
+    return str(soup), toc
+
+
+def _html_to_plain_text(html):
+    """Flatten reader HTML into clean plain text for sentence splitting."""
+    from bs4 import BeautifulSoup, NavigableString
+
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr"]):
+        tag.insert_before(NavigableString("\n\n"))
+    flat = soup.get_text()
+    flat = re.sub(r"[ \t]+", " ", flat)
+    flat = re.sub(r"\n{3,}", "\n\n", flat)
+    return flat.strip()
 
 
 def _extract_html(path: str, image_dir: str = None) -> dict:
@@ -946,46 +972,42 @@ def _build_pdf_toc(doc, reader_html):
 
 
 def _extract_docx(path: str, image_dir: str = None) -> dict:
-    import docx
+    import mammoth
 
-    doc = docx.Document(path)
-    texts = []
     images = []
-    char_offset = 0
+    convert_image = None
+    if image_dir:
 
-    for para in doc.paragraphs:
-        if para.text.strip():
-            texts.append(para.text)
+        def convert_image(image):
+            ext = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/jpg": ".jpg",
+                "image/gif": ".gif",
+                "image/webp": ".webp",
+            }.get(image.content_type, ".png")
+            filename = f"img_{len(images)}{ext}"
+            with image.open() as src, open(os.path.join(image_dir, filename), "wb") as dst:
+                dst.write(src.read())
+            images.append({"type": "image", "filename": filename, "alt": image.alt_text or ""})
+            return {"src": filename, "alt": image.alt_text or ""}
 
-        if image_dir:
-            for run in para.runs:
-                for rel in run.element.findall(
-                    ".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}drawing"
-                ):
-                    blips = rel.findall(".//{http://schemas.openxmlformats.org/drawingml/2006/main}blip")
-                    for blip in blips:
-                        embed = blip.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
-                        if embed and embed in doc.part.rels:
-                            image_part = doc.part.rels[embed].target_part
-                            ext = Path(image_part.partname).suffix
-                            filename = f"img_{len(images)}{ext}"
-                            with open(os.path.join(image_dir, filename), "wb") as f:
-                                f.write(image_part.blob)
-                            images.append(
-                                {
-                                    "type": "image",
-                                    "filename": filename,
-                                    "alt": "",
-                                    "char_offset": char_offset,
-                                }
-                            )
+        convert_image = mammoth.images.img_element(convert_image)
 
-        char_offset += len(para.text) + 2
+    with open(path, "rb") as f:
+        result = mammoth.convert_to_html(f, convert_image=convert_image)
 
-    total_chars = char_offset or 1
-    for img in images:
-        img["total_chars"] = total_chars
-    return {"text": "\n\n".join(texts), "images": images}
+    reader_html, toc = _normalize_reader_headings(result.value)
+    text = _html_to_plain_text(reader_html)
+
+    if images:
+        total_chars = len(text) or 1
+        step = total_chars // (len(images) + 1)
+        for i, img in enumerate(images):
+            img["char_offset"] = step * (i + 1)
+            img["total_chars"] = total_chars
+
+    return {"text": text, "images": images, "reader_html": reader_html, "toc": toc}
 
 
 def _extract_rtf(path: str, image_dir: str = None) -> dict:

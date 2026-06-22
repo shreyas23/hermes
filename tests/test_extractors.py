@@ -4,6 +4,8 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 
 from extractors import (
+    _extract_docx,
+    _extract_md,
     _is_safe_url,
     clean_html_for_reader,
     inject_sentence_spans,
@@ -161,3 +163,109 @@ def test_map_images_to_sentences_by_char_ratio():
     # ratio 60/90 = 0.66 -> int(0.66 * 3) = 2
     assert mapped[1]["after_sentence"] == 2
     assert mapped[1]["filename"] == "b.png"
+
+
+# --- _extract_md (structured HTML + TOC) ---
+
+MD_SAMPLE = """# Introduction
+
+Intro paragraph with **bold** and `inline`.
+
+## Details
+
+- one
+- two
+
+```python
+print("hi")
+```
+
+| A | B |
+|---|---|
+| 1 | 2 |
+"""
+
+
+def _write(tmp_path, name, content, mode="w"):
+    p = tmp_path / name
+    if mode == "wb":
+        p.write_bytes(content)
+    else:
+        p.write_text(content)
+    return str(p)
+
+
+def test_md_reader_html_has_structure(tmp_path):
+    result = _extract_md(_write(tmp_path, "doc.md", MD_SAMPLE))
+    html = result["reader_html"]
+    assert "<h1" in html
+    assert "<h2" in html
+    assert "<table" in html
+    assert "<code" in html
+    assert "<li>" in html
+
+
+def test_md_toc_is_valid(tmp_path):
+    result = _extract_md(_write(tmp_path, "doc.md", MD_SAMPLE))
+    toc = result["toc"]
+    assert toc == [
+        {"level": 1, "title": "Introduction", "id": "h-1"},
+        {"level": 2, "title": "Details", "id": "h-2"},
+    ]
+    # every TOC id resolves to a heading in the HTML
+    soup = BeautifulSoup(result["reader_html"], "html.parser")
+    for entry in toc:
+        assert soup.find(id=entry["id"]) is not None
+
+
+def test_md_plain_text_is_clean(tmp_path):
+    result = _extract_md(_write(tmp_path, "doc.md", MD_SAMPLE))
+    text = result["text"]
+    assert "<" not in text and ">" not in text
+    assert "Introduction" in text
+    assert "bold" in text
+    # markdown markup chars are gone
+    assert "**" not in text and "#" not in text
+
+
+# --- _extract_docx (structured HTML + TOC) ---
+
+
+def _make_docx(tmp_path):
+    import docx
+
+    d = docx.Document()
+    d.add_heading("Doc Title", level=1)
+    d.add_paragraph("Body paragraph.")
+    d.add_heading("Subsection", level=2)
+    d.add_paragraph("Another paragraph.")
+    path = str(tmp_path / "doc.docx")
+    d.save(path)
+    return path
+
+
+def test_docx_reader_html_has_headings(tmp_path):
+    result = _extract_docx(_make_docx(tmp_path))
+    html = result["reader_html"]
+    assert "<h1" in html
+    assert "Doc Title" in html
+    assert "<p>" in html
+
+
+def test_docx_toc_is_valid(tmp_path):
+    result = _extract_docx(_make_docx(tmp_path))
+    toc = result["toc"]
+    titles = [e["title"] for e in toc]
+    assert "Doc Title" in titles
+    assert "Subsection" in titles
+    soup = BeautifulSoup(result["reader_html"], "html.parser")
+    for entry in toc:
+        assert soup.find(id=entry["id"]) is not None
+
+
+def test_docx_plain_text_is_clean(tmp_path):
+    result = _extract_docx(_make_docx(tmp_path))
+    text = result["text"]
+    assert "<" not in text and ">" not in text
+    assert "Doc Title" in text
+    assert "Body paragraph." in text
