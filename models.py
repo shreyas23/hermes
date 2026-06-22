@@ -464,6 +464,10 @@ DEFAULTS = {
     "tts_engine": "edge",
     "edge_voice": "en-US-AriaNeural",
     "say_voice": "Samantha",  # Download Siri voices from System Settings > Accessibility > Spoken Content
+    "kokoro_voice": "af_heart",
+    "kokoro_model": "kokoro-v1.0-int8",
+    "kokoro-mlx_voice": "af_heart",
+    "piper_voice": "en_US-lessac-medium",
     "pdf_tables": "off",
 }
 

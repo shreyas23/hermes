@@ -1,4 +1,3 @@
-import asyncio
 import os
 import subprocess
 import threading
@@ -6,10 +5,8 @@ import wave
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
+from engines import get_engine
 from models import close_db, item_audio_dir, item_master_m4a, item_master_wav, update_item_audio
-
-TTS_WORKERS = 4
-EDGE_TTS_VOICE = "en-US-AriaNeural"
 
 
 @dataclass
@@ -23,97 +20,33 @@ _active_jobs: dict[int, threading.Event] = {}
 _jobs_lock = threading.Lock()
 
 
-def _generate_sentence_wav_say(i, text, audio_dir, cancel_event, voice="Samantha"):
-    if cancel_event.is_set():
-        return i, 0
-    sent_wav = os.path.join(audio_dir, f"sent_{i:04d}.wav")
-    try:
-        subprocess.run(
-            ["say", "-v", voice, "-o", sent_wav, "--file-format=WAVE", "--data-format=LEI16@22050", text],
-            check=True,
-            capture_output=True,
-            timeout=60,
-        )
-        return i, _wav_duration_ms(sent_wav)
-    except Exception as e:
-        print(f"Failed to generate sentence {i}: {e}")
-        return i, 0
-
-
-async def _generate_sentence_wav_edge(i, text, audio_dir, cancel_event, voice=EDGE_TTS_VOICE):
-    if cancel_event.is_set():
-        return i, 0
-    import edge_tts
-
-    mp3_path = os.path.join(audio_dir, f"sent_{i:04d}.mp3")
-    wav_path = os.path.join(audio_dir, f"sent_{i:04d}.wav")
-    try:
-        comm = edge_tts.Communicate(text, voice)
-        await comm.save(mp3_path)
-        subprocess.run(
-            ["afconvert", "-f", "WAVE", "-d", "LEI16@22050", mp3_path, wav_path],
-            check=True,
-            capture_output=True,
-            timeout=30,
-        )
-        os.unlink(mp3_path)
-        return i, _wav_duration_ms(wav_path)
-    except Exception as e:
-        print(f"Failed to generate sentence {i} (edge): {e}")
-        for p in (mp3_path, wav_path):
-            if os.path.exists(p):
-                os.unlink(p)
-        return i, 0
-
-
-def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, engine="edge", voice=None):
+def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, engine="edge", voice=None, model=None):
     audio_dir = item_audio_dir(item_id)
     os.makedirs(audio_dir, exist_ok=True)
+
+    tts = get_engine(engine)
+    tts.configure(model=model)
 
     durations = [0.0] * len(sentences)
     completed = 0
     progress_lock = threading.Lock()
 
-    voice = voice or (EDGE_TTS_VOICE if engine == "edge" else "Samantha")
-
-    if engine == "edge":
-
-        async def run_edge():
-            nonlocal completed
-            sem = asyncio.Semaphore(8)
-
-            async def gen(i, text):
-                nonlocal completed
-                async with sem:
-                    if cancel_event.is_set():
-                        return
-                    idx, dur = await _generate_sentence_wav_edge(i, text, audio_dir, cancel_event, voice)
-                    durations[idx] = dur
-                    with progress_lock:
-                        completed += 1
-                        if on_progress:
-                            on_progress(completed, len(sentences))
-
-            await asyncio.gather(*[gen(i, t) for i, t in enumerate(sentences)], return_exceptions=True)
-
-        asyncio.run(run_edge())
-    else:
-        with ThreadPoolExecutor(max_workers=TTS_WORKERS) as pool:
-            futures = {
-                pool.submit(_generate_sentence_wav_say, i, text, audio_dir, cancel_event, voice): i
-                for i, text in enumerate(sentences)
-            }
-            for future in as_completed(futures):
-                if cancel_event.is_set():
-                    pool.shutdown(wait=False, cancel_futures=True)
-                    _cleanup_partial(audio_dir, len(sentences))
-                    return None, 0
-                idx, dur = future.result()
-                durations[idx] = dur
-                with progress_lock:
-                    completed += 1
-                    if on_progress:
-                        on_progress(completed, len(sentences))
+    with ThreadPoolExecutor(max_workers=tts.max_workers) as pool:
+        futures = {
+            pool.submit(tts.generate_sentence, i, text, audio_dir, cancel_event, voice): i
+            for i, text in enumerate(sentences)
+        }
+        for future in as_completed(futures):
+            if cancel_event.is_set():
+                pool.shutdown(wait=False, cancel_futures=True)
+                _cleanup_partial(audio_dir, len(sentences))
+                return None, 0
+            idx, dur = future.result()
+            durations[idx] = dur
+            with progress_lock:
+                completed += 1
+                if on_progress:
+                    on_progress(completed, len(sentences))
 
     if cancel_event.is_set():
         _cleanup_partial(audio_dir, len(sentences))
@@ -151,7 +84,7 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
 
 
 def generate_audio_background(
-    item_id, sentences, on_progress=None, on_complete=None, on_cancel=None, engine="edge", voice=None
+    item_id, sentences, on_progress=None, on_complete=None, on_cancel=None, engine="edge", voice=None, model=None
 ):
     cancel_event = threading.Event()
 
@@ -162,7 +95,9 @@ def generate_audio_background(
 
     def run():
         try:
-            timeline, total_ms = generate_audio_for_item(item_id, sentences, cancel_event, on_progress, engine, voice)
+            timeline, total_ms = generate_audio_for_item(
+                item_id, sentences, cancel_event, on_progress, engine, voice, model
+            )
             if timeline is None:
                 if on_cancel:
                     on_cancel(item_id)
@@ -232,23 +167,20 @@ def _convert_to_m4a(wav_path, m4a_path):
 
 def _concatenate_wavs(audio_dir, count, output_path):
     params_set = False
+    framerate = 22050
     with wave.open(output_path, "wb") as out:
         for i in range(count):
             sent_path = os.path.join(audio_dir, f"sent_{i:04d}.wav")
             if not os.path.exists(sent_path):
                 if params_set:
-                    # 100ms silence at 22050Hz 16-bit mono
-                    out.writeframes(b"\x00" * (22050 * 2 // 10))
+                    # 100ms silence at the master framerate, 16-bit mono
+                    out.writeframes(b"\x00" * (framerate * 2 // 10))
                 continue
             with wave.open(sent_path, "rb") as inp:
                 if not params_set:
                     out.setparams(inp.getparams())
+                    framerate = inp.getframerate()
                     params_set = True
                 out.writeframes(inp.readframes(inp.getnframes()))
     if not params_set:
         os.unlink(output_path)
-
-
-def _wav_duration_ms(path):
-    with wave.open(path, "rb") as wf:
-        return (wf.getnframes() / wf.getframerate()) * 1000

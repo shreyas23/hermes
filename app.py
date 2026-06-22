@@ -165,7 +165,9 @@ def library_generate(item_id):
         return jsonify({"error": "Audio already generated"}), 400
     if is_generating(item_id):
         return jsonify({"error": "Already generating"}), 400
-    _start_generation(item_id, item["sentences"])
+    data = request.json or {}
+    engine_override = data.get("engine")
+    _start_generation(item_id, item["sentences"], engine_override=engine_override)
     return jsonify({"generating": True, "item_id": item_id})
 
 
@@ -590,7 +592,17 @@ def settings_get():
     return jsonify(get_all_settings())
 
 
-_ALLOWED_SETTINGS = {"tts_engine", "edge_voice", "say_voice", "theme", "design"}
+_ALLOWED_SETTINGS = {
+    "tts_engine",
+    "edge_voice",
+    "say_voice",
+    "kokoro_voice",
+    "kokoro_model",
+    "kokoro-mlx_voice",
+    "piper_voice",
+    "theme",
+    "design",
+}
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -654,41 +666,12 @@ def _watch_folder_scanner():
         time.sleep(30)
 
 
-_edge_voices_cache = []
-
-
 @app.route("/api/voices", methods=["GET"])
 def voices_list():
-    global _edge_voices_cache
+    from engines import get_engine
+
     engine = request.args.get("engine", "edge")
-    if engine == "edge":
-        if not _edge_voices_cache:
-            import asyncio
-
-            import edge_tts
-
-            loop = asyncio.new_event_loop()
-            try:
-                all_voices = loop.run_until_complete(edge_tts.list_voices())
-            finally:
-                loop.close()
-            _edge_voices_cache = [
-                {"id": v["ShortName"], "name": v["ShortName"], "gender": v["Gender"], "locale": v["Locale"]}
-                for v in all_voices
-                if v["Locale"].startswith("en-")
-            ]
-        return jsonify({"voices": _edge_voices_cache})
-    else:
-        import subprocess
-
-        out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True)
-        voices = []
-        for line in out.stdout.splitlines():
-            parts = line.split()
-            if len(parts) >= 2 and "en_" in line:
-                name = parts[0]
-                voices.append({"id": name, "name": name, "locale": parts[1] if len(parts) > 1 else ""})
-        return jsonify({"voices": voices})
+    return jsonify({"voices": get_engine(engine).list_voices()})
 
 
 # --- SSE ---
@@ -787,7 +770,7 @@ def _split(text):
     return [s.strip() for s in sentences if s.strip()]
 
 
-def _start_generation(item_id, sentences):
+def _start_generation(item_id, sentences, engine_override=None):
     set_audio_requested(item_id, True)
 
     def on_progress(done, total):
@@ -812,9 +795,12 @@ def _start_generation(item_id, sentences):
     def on_cancel(iid):
         broadcast_sse("generation_cancelled", {"item_id": iid})
 
-    engine = get_setting("tts_engine")
-    voice = get_setting("edge_voice") if engine == "edge" else get_setting("say_voice")
-    generate_audio_background(item_id, sentences, on_progress, on_complete, on_cancel, engine=engine, voice=voice)
+    engine = engine_override or get_setting("tts_engine")
+    voice = get_setting(f"{engine}_voice")
+    model = get_setting("kokoro_model") if engine == "kokoro" else None
+    generate_audio_background(
+        item_id, sentences, on_progress, on_complete, on_cancel, engine=engine, voice=voice, model=model
+    )
 
 
 def _item_summary(item):

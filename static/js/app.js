@@ -67,11 +67,48 @@ document.querySelectorAll('.modal__close').forEach(btn => {
   btn.addEventListener('click', () => btn.closest('.modal-backdrop')?.classList.remove('is-visible'));
 });
 
-// Opt-in audio generation controls.
+// Opt-in audio generation controls — split button with engine picker.
+let selectedEngine = 'edge';
+const genMenu = document.getElementById('audio-gen-menu');
+api('/api/settings').then(s => {
+  selectedEngine = s.tts_engine || 'edge';
+  updateActiveEngine();
+});
+
+function updateActiveEngine() {
+  genMenu.querySelectorAll('.audio-gen__menu-item').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.engine === selectedEngine);
+  });
+}
+
+document.getElementById('audio-gen-caret').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (genMenu.classList.contains('is-visible')) {
+    genMenu.classList.remove('is-visible');
+    return;
+  }
+  const rect = e.currentTarget.getBoundingClientRect();
+  genMenu.classList.add('is-visible');
+  const menuH = genMenu.offsetHeight;
+  const above = rect.top - menuH - 4;
+  genMenu.style.left = `${rect.left + rect.width / 2 - 90}px`;
+  genMenu.style.top = above >= 0 ? `${above}px` : `${rect.bottom + 4}px`;
+});
+
+genMenu.addEventListener('click', (e) => {
+  const item = e.target.closest('.audio-gen__menu-item');
+  if (!item) return;
+  selectedEngine = item.dataset.engine;
+  updateActiveEngine();
+  genMenu.classList.remove('is-visible');
+});
+
+document.addEventListener('click', () => genMenu.classList.remove('is-visible'));
+
 document.getElementById('audio-gen-action').addEventListener('click', async () => {
   const id = state.currentItemId;
   if (!id) return;
-  const data = await api(`/api/library/${id}/generate`, { method: 'POST' });
+  const data = await api(`/api/library/${id}/generate`, { method: 'POST', body: { engine: selectedEngine } });
   if (data.error) return;
   if (state.currentItem) state.currentItem.generating = true;
   renderAudioGen({ generating: true });
@@ -154,15 +191,16 @@ async function openItem(itemId) {
 
 function renderAudioGen(item) {
   audioGen.classList.remove('is-hidden');
-  const action = document.getElementById('audio-gen-action');
+  const split = document.getElementById('audio-gen-split');
   const progress = document.getElementById('audio-gen-progress');
   const note = document.getElementById('audio-gen-note');
+  genMenu.classList.remove('is-visible');
   if (item.generating) {
-    action.classList.add('is-hidden');
+    split.classList.add('is-hidden');
     progress.classList.remove('is-hidden');
     note.textContent = '';
   } else {
-    action.classList.remove('is-hidden');
+    split.classList.remove('is-hidden');
     progress.classList.add('is-hidden');
     note.textContent = item.interrupted ? 'Audio generation was interrupted.' : '';
     setGenProgress(0);

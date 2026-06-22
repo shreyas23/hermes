@@ -156,7 +156,18 @@
         </div>
 
         <div class="audio-gen is-hidden" id="audio-gen">
-          <button class="audio-gen__action" id="audio-gen-action">Generate audio</button>
+          <div class="audio-gen__split" id="audio-gen-split">
+            <button class="audio-gen__action" id="audio-gen-action">Generate</button><button class="audio-gen__caret" id="audio-gen-caret" aria-label="Choose engine">&#9662;</button>
+            <div class="audio-gen__menu" id="audio-gen-menu">
+              <div class="audio-gen__menu-item" data-engine="edge">Edge TTS</div>
+              <div class="audio-gen__menu-item" data-engine="say">macOS Say</div>
+              <div class="audio-gen__menu-item" data-engine="kokoro">Kokoro (CPU)</div>
+              <div class="audio-gen__menu-item" data-engine="kokoro-mlx">Kokoro MLX (GPU)
+                <span class="audio-gen__menu-note">~2 GB memory</span>
+              </div>
+              <div class="audio-gen__menu-item" data-engine="piper">Piper (local, fast)</div>
+            </div>
+          </div>
           <div class="audio-gen__progress is-hidden" id="audio-gen-progress">
             <div class="audio-gen__track"><div class="audio-gen__fill" id="audio-gen-fill"></div></div>
             <span class="audio-gen__pct" id="audio-gen-pct">0%</span>
@@ -261,6 +272,9 @@
         <select class="settings-select" id="setting-engine">
           <option value="edge">Edge TTS (online, faster)</option>
           <option value="say">macOS Say (offline)</option>
+          <option value="kokoro">Kokoro (local, CPU)</option>
+          <option value="kokoro-mlx">Kokoro MLX (local, GPU)</option>
+          <option value="piper">Piper (local, fast)</option>
         </select>
       </div>
 
@@ -284,6 +298,21 @@
           <input type="text" class="modal__input watch-folders__input" id="watch-folder-path" placeholder="~/Documents/reading">
           <button class="modal__submit watch-folders__btn" id="watch-folder-add-btn">Add</button>
         </div>
+      </div>
+
+      <div class="settings-group is-hidden" id="kokoro-voice-group">
+        <label class="settings-label" for="setting-kokoro-voice">Kokoro Voice</label>
+        <select class="settings-select" id="setting-kokoro-voice"></select>
+      </div>
+
+      <div class="settings-group is-hidden" id="kokoro-mlx-voice-group">
+        <label class="settings-label" for="setting-kokoro-mlx-voice">Kokoro MLX Voice</label>
+        <select class="settings-select" id="setting-kokoro-mlx-voice"></select>
+      </div>
+
+      <div class="settings-group is-hidden" id="piper-voice-group">
+        <label class="settings-label" for="setting-piper-voice">Piper Voice</label>
+        <select class="settings-select" id="setting-piper-voice"></select>
       </div>
 
       <button class="modal__submit" id="settings-save">Save</button>
