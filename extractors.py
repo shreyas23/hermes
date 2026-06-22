@@ -647,6 +647,9 @@ def _extract_md(path: str, image_dir: str = None) -> dict:
                     }
                 )
 
+    # Python-Markdown needs a blank line before lists/blockquotes following a paragraph
+    text = re.sub(r"([^\n])\n([-*+] |\d+\. |> )", r"\1\n\n\2", text)
+
     md = md_lib.Markdown(extensions=["extra", "toc"])
     html = md.convert(text)
     reader_html, toc = _normalize_reader_headings(html)
@@ -681,6 +684,8 @@ def _html_to_plain_text(html):
     flat = soup.get_text()
     flat = re.sub(r"[ \t]+", " ", flat)
     flat = re.sub(r"\n{3,}", "\n\n", flat)
+    # Single newlines are source line-wraps within blocks — collapse to spaces
+    flat = re.sub(r"(?<!\n)\n(?!\n)", " ", flat)
     return flat.strip()
 
 
