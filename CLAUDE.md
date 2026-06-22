@@ -164,19 +164,57 @@ Ordered by dependency and impact — each tier makes the product meaningfully be
 
 ## Testing
 
-Playwright E2E tests run against the Flask server on port 5199 (no PyWebView). Scripts live in `e2e/`.
-
-### Running
+Two test layers, each runnable with one command:
 
 ```
-npm run e2e
+uv run pytest              # Python unit + integration tests (<1s)
+npm run e2e:all            # All Playwright E2E tests (~2min)
 ```
 
-### Rules
+The pre-commit hook runs ruff + pytest on every commit. CI (`.github/workflows/test.yml`) runs both layers on every push/PR.
+
+### Python tests (pytest)
+
+Tests live in `tests/`. `conftest.py` provides shared fixtures:
+
+- **`isolated_db` (autouse)** — every test gets a fresh SQLite in a temp dir. Overrides `models.LIBRARY_DIR`, `DB_PATH`, `AUDIO_DIR`, `IMAGES_DIR`. No setup needed.
+- **`client`** — Flask `test_client()` with isolated DB ready.
+- **`sample_item`** — pre-seeded 3-sentence text item, returns `(item_id, sentences)`.
+- **`audio_ready_item`** — extends `sample_item` with synthetic silent WAV + timeline.
+
+| File | What it covers |
+|------|---------------|
+| `test_models.py` | Item CRUD, cascading deletes, progress upsert, search escaping, collections, feeds, bookmarks |
+| `test_extractors.py` | `_is_safe_url` SSRF guard, `inject_sentence_spans`, `clean_html_for_reader`, image-to-sentence mapping |
+| `test_routes.py` | API integration: imports, progress, bookmarks, audio serving, path traversal, settings |
+| `test_audio.py` | WAV concatenation, silence padding, partial cleanup |
+| `test_discovery.py` | `strip_html`, feed entry normalization |
+
+To add a test: create a function in the right `tests/test_*.py` file, use any fixture from conftest, run `uv run pytest tests/test_file.py::test_name`.
+
+### E2E tests (Playwright)
+
+Scripts live in `e2e/`. Each test starts its own Flask server on an isolated temp DB (never touches `~/hermes-library`). The shared `e2e/harness.mjs` handles server lifecycle, browser setup, and assertions.
+
+| Script | Port | What it covers |
+|--------|------|---------------|
+| `bookmarks.mjs` | 5193 | Add/persist/jump/delete bookmark, annotations |
+| `search.mjs` | 5194 | Find-in-transcript: highlighting, next/prev/wrap |
+| `media-keys.mjs` | 5195 | Media Session handler registration, metadata |
+| `discover.mjs` | 5196 | Wikipedia search, import, feeds tab, pending UI |
+| `screenshot.mjs` | 5197 | Visual smoke: empty, item open, playing states |
+| `import.mjs` | 5198 | Text import, sidebar rendering, sentence spans |
+| `collections.mjs` | 5191 | Create/add/view/remove/delete collections |
+| `queue-timer.mjs` | 5199 | Play queue and sleep timer |
+
+To add an E2E test: create a new `.mjs` file, import from `harness.mjs`, pick an unused port, add it to `e2e:all` in `package.json`.
+
+### E2E rules
 
 - **Screenshot after every UI change.** Before reporting a visual change as done, run `node e2e/screenshot.mjs` and read the screenshots. Don't ship layout you haven't seen.
-- **Flask server on port 5199.** Tests start their own server using `/opt/homebrew/bin/uv run python -c "..."` — never connect to the user's running app on 5123.
+- **Each test gets its own port.** Never connect to the user's running app on 5123.
 - **Use `domcontentloaded`, not `networkidle`.** The SSE endpoint keeps connections open — `networkidle` will timeout.
+- **Prefer `waitForSelector`/`waitForFunction` over `sleep()`.** Hardcoded sleeps are flaky.
 - **Screenshots go in `e2e/screenshots/`.** This directory is gitignored. Name files with numbered prefixes: `01-empty.png`, `02-item-open.png`, etc.
 - **Audio is opt-in — pick audio-ready items for playback tests.** Imports no longer auto-generate audio; new items are `pending` (sidebar shows a status badge, the reader shows a Generate-audio bar, transport controls are hidden). To test playback, select an item with audio (`.item:not(:has(.badge))`) or generate audio first. Use an isolated temp library (override `models.DB_PATH`/`AUDIO_DIR`/`IMAGES_DIR` before `from app import app`) for feature tests so the real library is untouched.
 
