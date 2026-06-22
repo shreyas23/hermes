@@ -142,7 +142,8 @@ Ordered by dependency and impact — each tier makes the product meaningfully be
 - **Watch folders** — auto-import new files from designated directories
 
 **4. Audio quality** — voice quality is the single biggest factor in whether someone keeps listening
-- **Alternative TTS engines** — Edge TTS or OpenAI TTS for higher-quality voices
+- **Kokoro TTS** — Kokoro-82M runs locally on Apple Silicon with near-cloud quality. Eliminates the need for cloud TTS while keeping everything private. Multiple voices, fast inference via `kokoro-onnx`.
+- **OpenAI TTS** — optional cloud fallback for users who want the highest fidelity and don't mind API calls
 
 **5. Content expansion** — feeds are subscribable today; this makes them proactive
 - **Background feed sync** — periodically pull new entries from subscribed feeds into the library (currently entries are fetched on-demand in Discover)
