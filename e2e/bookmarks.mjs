@@ -13,6 +13,7 @@ const server = spawn('uv', ['run', 'python', '-c', [
   "d = tempfile.mkdtemp()",
   "models.LIBRARY_DIR = d; models.DB_PATH = os.path.join(d, 't.db')",
   "models.AUDIO_DIR = os.path.join(d, 'audio'); models.IMAGES_DIR = os.path.join(d, 'images')",
+  "models.THEMES_DIR = os.path.join(d, 'themes')",
   "from app import app, init_db",
   "init_db()",
   "sents = ['First passage about gravity.', 'Second passage about momentum.', 'Third passage about energy.']",

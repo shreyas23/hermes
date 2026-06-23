@@ -17,6 +17,7 @@ const server = spawn('uv', ['run', 'python', '-c', [
   "models.DB_PATH = os.path.join(d, 't.db')",
   "models.AUDIO_DIR = os.path.join(d, 'audio')",
   "models.IMAGES_DIR = os.path.join(d, 'images')",
+  "models.THEMES_DIR = os.path.join(d, 'themes')",
   "from app import app, init_db",
   "init_db()",
   `app.run(port=${PORT}, threaded=True, use_reloader=False)`,

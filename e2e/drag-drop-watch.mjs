@@ -13,7 +13,7 @@ execSync(`mkdir -p ${DIR}`);
 
 const server = spawn('uv', ['run', 'python', '-c', [
   "import sys; sys.path.insert(0, '.')",
-  "import models; models.DB_PATH = '/tmp/hermes-test-dragdrop.db'; models.AUDIO_DIR = '/tmp/hermes-test-audio'; models.IMAGES_DIR = '/tmp/hermes-test-images'",
+  "import models; models.DB_PATH = '/tmp/hermes-test-dragdrop.db'; models.AUDIO_DIR = '/tmp/hermes-test-audio'; models.IMAGES_DIR = '/tmp/hermes-test-images'; models.THEMES_DIR = '/tmp/hermes-test-themes'",
   "from app import app, init_db",
   "init_db()",
   `app.run(port=${PORT}, threaded=True, use_reloader=False)`,
