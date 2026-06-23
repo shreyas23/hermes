@@ -27,19 +27,8 @@ jobs:
       - name: Build app bundle
         run: uv run pyinstaller hermes.spec --noconfirm
 
-      - name: Install create-dmg
-        run: brew install create-dmg
-
       - name: Create DMG
-        run: |
-          create-dmg \
-            --volname "Hermes" \
-            --window-size 600 400 \
-            --icon "Hermes.app" 150 200 \
-            --app-drop-link 450 200 \
-            --format UDZO \
-            "dist/Hermes-${VERSION}-mac.dmg" \
-            dist/Hermes.app
+        run: hdiutil create -volname "Hermes" -srcfolder dist/Hermes.app -ov -format UDZO "dist/Hermes-${VERSION}-mac.dmg"
 
       - name: Generate checksum
         run: shasum -a 256 "dist/Hermes-${VERSION}-mac.dmg" > "dist/Hermes-${VERSION}-mac.dmg.sha256"
