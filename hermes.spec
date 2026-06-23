@@ -33,12 +33,10 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'onnxruntime', 'pymupdf_layout', 'numpy',
+        'onnxruntime', 'pymupdf_layout',
         'torch', 'torchaudio', 'torchvision',
-        'mlx', 'mlx_lm',
         'spacy', 'thinc', 'blis', 'cymem', 'preshed', 'murmurhash', 'srsly',
         'babel',
-        'piper', 'piper_phonemize', 'phonemizer_fork',
         'hf_xet', 'huggingface_hub', 'safetensors', 'tokenizers', 'transformers',
         'soundfile', 'sounddevice',
         'scipy', 'pandas', 'matplotlib', 'PIL', 'cv2',
