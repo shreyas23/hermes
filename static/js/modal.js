@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { confirmAction } from './confirm-modal.js';
 import { toastSuccess, toastError } from './toast.js';
-import { escHtml } from './utils.js';
+import { escHtml, isYouTubeUrl } from './utils.js';
 
 const backdrop = document.getElementById('import-modal');
 let onImported = null;
@@ -65,10 +65,12 @@ async function importUrl() {
   const url = document.getElementById('import-url').value.trim();
   if (!url) return;
   const btn = document.getElementById('import-url-btn');
-  btn.textContent = 'Importing...';
+  const isYT = isYouTubeUrl(url);
+  btn.textContent = isYT ? 'Importing video...' : 'Importing...';
   btn.disabled = true;
-  const data = await importWithDuplicateCheck('/api/import/url', { url });
-  btn.textContent = 'Import Article';
+  const endpoint = isYT ? '/api/import/youtube' : '/api/import/url';
+  const data = await importWithDuplicateCheck(endpoint, { url });
+  btn.textContent = 'Import';
   btn.disabled = false;
   if (!data || data.error) return;
   document.getElementById('import-url').value = '';

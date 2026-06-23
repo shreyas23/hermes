@@ -533,6 +533,12 @@
   margin-bottom: var(--space-4);
 }
 
+.reader__no-transcript {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: var(--space-12) var(--space-6);
+}
+
 .reader__scroll img {
   max-width: 100%;
 }

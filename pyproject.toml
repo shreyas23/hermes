@@ -20,6 +20,7 @@ dependencies = [
     "readability-lxml>=0.8.4.1",
     "striprtf>=0.0.32",
     "trafilatura>=2.1.0",
+    "yt-dlp>=2024.0.0",
 ]
 
 [dependency-groups]

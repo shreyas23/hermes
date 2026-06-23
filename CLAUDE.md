@@ -37,6 +37,7 @@ Hermes is a **productive information hub**, not just a document reader. The goal
 - `audio.py` — TTS generation, WAV concatenation, caching
 - `extractors.py` — Text extraction (PDF via pymupdf4llm, DOCX via python-docx, HTML via bs4, RTF via striprtf, MD/TXT built-in); Wikipedia citation/appendix stripping
 - `discovery.py` — Article discovery: Wikipedia search + RSS/Atom feed aggregation
+- `youtube.py` — YouTube import: yt-dlp metadata, audio download, VTT caption parsing
 - `static/js/app.js` — Frontend: init, item opening, SSE events
 - `static/js/reader-highlight.js` — Reader view rendering, sentence highlighting, TOC panel
 - `static/js/player.js` — Audio playback, scrubber, progress saving, media-key (Media Session) integration
@@ -83,13 +84,14 @@ cd ~/hermes && uv run python app.py
 
 ## Import flow
 
-1. User imports via URL, file path, folder scan, pasted text, drag-and-drop (multipart upload via `/api/import/upload`), or auto-import from watch folders (background scanner, 30s interval)
+1. User imports via URL, file path, folder scan, pasted text, drag-and-drop (multipart upload via `/api/import/upload`), YouTube URL, or auto-import from watch folders (background scanner, 30s interval)
 2. Text extracted → split into sentences → stored in SQLite
 3. **PDFs:** pymupdf4llm extracts structured markdown using `TocHeaders` for heading hierarchy from PDF bookmarks. Markdown is cleaned (TOC pages stripped, page footers removed, bold-only lines matching TOC entries promoted to headings), converted to HTML via the `markdown` library, and table rows/columns are merged to fix pymupdf4llm's cell-splitting artifacts. The result is stored as `reader_html` with a navigable `toc` (JSON array of `{level, title, id}` entries). Table rendering is controlled by the `pdf_tables` setting (default: `off`).
 4. **URLs:** readability extracts article HTML, cleaned and stored as `reader_html`
-5. Background thread generates per-sentence audio, concatenates into master file
-6. SSE broadcasts generation progress to frontend
-7. Once complete, audio is cached — subsequent plays are instant with native scrubbing
+5. **YouTube:** yt-dlp extracts audio as m4a (no TTS needed) and fetches VTT captions. Captions are parsed into sentences with timestamp-based timeline for teleprompter sync. If no captions are available, the item stores audio-only with a placeholder transcript. YouTube URLs are auto-detected when pasting (Cmd+V) or in Discover.
+6. Background thread generates per-sentence audio, concatenates into master file
+7. SSE broadcasts generation progress to frontend
+8. Once complete, audio is cached — subsequent plays are instant with native scrubbing
 
 ## Playback
 
@@ -103,7 +105,7 @@ cd ~/hermes && uv run python app.py
 
 ## Dependencies
 
-Managed via `uv`. Key deps: flask, pywebview, pymupdf, pymupdf4llm, markdown, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura.
+Managed via `uv`. Key deps: flask, pywebview, pymupdf, pymupdf4llm, markdown, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura, yt-dlp.
 
 Note: system pip/pip3 have a broken expat library on this machine — always use `uv` for dependency management.
 
@@ -164,7 +166,7 @@ Stored in SQLite `settings` table. Key settings:
 
 Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
 
-**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item), drag-and-drop import (multipart upload), watch folders (background scanner every 30s, managed in Settings), teleprompter mode (immersive centered-sentence view, toggle via T key or toolbar button).
+**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item), drag-and-drop import (multipart upload), watch folders (background scanner every 30s, managed in Settings), teleprompter mode (immersive centered-sentence view, toggle via T key or toolbar button), YouTube audio import (paste URL or Discover, yt-dlp audio extraction + VTT caption sync).
 
 **1. Capture & export** — close the loop on the comprehension tools we just shipped
 - **Export highlights** — export stored bookmarks & annotations (Markdown/file); builds directly on the `bookmarks` table

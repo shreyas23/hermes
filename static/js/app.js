@@ -16,6 +16,7 @@ import { initDashboard, loadDashboard as _loadDashboard } from './dashboard.js';
 const DASHBOARD_ENABLED = false;
 const loadDashboard = DASHBOARD_ENABLED ? _loadDashboard : () => {};
 import { toastSuccess, toastError } from './toast.js';
+import { isYouTubeUrl } from './utils.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -140,7 +141,12 @@ async function importFromClipboard(forceText = false) {
     const text = await navigator.clipboard.readText();
     if (!text?.trim()) { toastError('Clipboard is empty'); return; }
     const trimmed = text.trim();
-    if (!forceText && /^https?:\/\//i.test(trimmed)) {
+    if (!forceText && isYouTubeUrl(trimmed)) {
+      toastSuccess('Importing YouTube video...');
+      const data = await api('/api/import/youtube', { body: { url: trimmed } });
+      if (data.error) return;
+      onImport(data.item_id);
+    } else if (!forceText && /^https?:\/\//i.test(trimmed)) {
       toastSuccess('Importing URL...');
       const data = await api('/api/import/url', { body: { url: trimmed } });
       if (data.error) return;
@@ -210,6 +216,12 @@ connectSSE({
     loadDashboard();
   },
   generation_cancelled: (data) => {
+    if (data.item_id === state.currentItemId) {
+      openItem(state.currentItemId);
+    }
+    loadView(state.currentView);
+  },
+  item_updated: (data) => {
     if (data.item_id === state.currentItemId) {
       openItem(state.currentItemId);
     }

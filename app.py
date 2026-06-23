@@ -59,9 +59,19 @@ from models import (
     set_setting,
     switch_library,
     update_bookmark_note,
+    update_item_audio,
     update_item_content,
     update_progress,
     update_watch_folder_scanned,
+)
+from youtube import (
+    captions_to_sentences,
+    download_audio,
+    extract_video_id,
+    fetch_captions,
+    fetch_metadata,
+    is_youtube_url,
+    parse_vtt,
 )
 
 app = Flask(__name__)
@@ -193,6 +203,16 @@ def library_regenerate(item_id):
     if os.path.isdir(audio_dir):
         shutil.rmtree(audio_dir)
     reset_item_audio(item_id)
+
+    if item.get("source_type") == "youtube" and item.get("source_url"):
+        vtt_content = fetch_captions(item["source_url"])
+        timeline = None
+        if vtt_content:
+            segments = parse_vtt(vtt_content)
+            sentences, timeline = captions_to_sentences(segments, segmenter)
+            update_item_content(item_id, text_content=" ".join(sentences), sentences=sentences)
+        _start_youtube_download(item_id, item["source_url"], timeline)
+        return jsonify({"generating": True, "item_id": item_id, "re_extracted": bool(vtt_content)})
 
     sentences = item["sentences"]
     re_extracted = _re_extract(item)
@@ -519,6 +539,129 @@ def import_folder():
                 break
 
     return jsonify({"folder": folder, "files": files})
+
+
+@app.route("/api/import/youtube", methods=["POST"])
+def import_youtube():
+    body = request.get_json(silent=True) or {}
+    url = body.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    if not is_youtube_url(url):
+        return jsonify({"error": "Not a YouTube URL"}), 400
+
+    if not body.get("force"):
+        existing = find_duplicate(source_url=url)
+        if existing:
+            return jsonify({"error": "duplicate", "existing": existing}), 409
+
+    video_id = extract_video_id(url) or url
+    item_id = add_item(
+        title=video_id,
+        source_type="youtube",
+        text_content=video_id,
+        sentences=[video_id],
+        source_url=url,
+    )
+
+    _start_youtube_download(item_id, url)
+
+    return jsonify({"item_id": item_id, "title": video_id})
+
+
+def _start_youtube_download(item_id, url):
+    set_audio_requested(item_id, True)
+
+    def on_progress(percent):
+        broadcast_sse(
+            "generation_progress",
+            {
+                "item_id": item_id,
+                "done": int(percent),
+                "total": 100,
+            },
+        )
+
+    def run():
+        try:
+            try:
+                meta = fetch_metadata(url)
+            except Exception:
+                meta = {"title": url, "duration_s": 0, "channel": "", "video_id": ""}
+
+            vtt_content = fetch_captions(url)
+            timeline = None
+
+            if vtt_content:
+                segments = parse_vtt(vtt_content)
+                sentences, timeline = captions_to_sentences(segments, segmenter)
+                text_content = " ".join(sentences)
+            else:
+                sentences = [meta["title"]]
+                text_content = meta["title"]
+
+            update_item_content(item_id, text_content=text_content, sentences=sentences)
+
+            from models import get_db
+
+            with get_db() as db:
+                db.execute(
+                    "UPDATE items SET title = ?, updated_at = ? WHERE id = ?",
+                    (meta["title"], time.time(), item_id),
+                )
+
+            broadcast_sse("item_updated", {"item_id": item_id})
+
+            cancel_event = threading.Event()
+            audio_dir = item_audio_dir(item_id)
+            os.makedirs(audio_dir, exist_ok=True)
+
+            output_path = download_audio(url, audio_dir, cancel_event, on_progress)
+
+            if not output_path or not os.path.isfile(output_path):
+                broadcast_sse("generation_cancelled", {"item_id": item_id})
+                return
+
+            target = item_master_m4a(item_id)
+            if output_path != target:
+                os.rename(output_path, target)
+
+            total_duration_ms = _get_audio_duration_ms(target)
+
+            if timeline:
+                final_timeline = timeline
+            else:
+                final_timeline = [{"index": 0, "start_ms": 0, "duration_ms": total_duration_ms}]
+
+            update_item_audio(item_id, final_timeline, total_duration_ms, tts_engine="youtube")
+
+            broadcast_sse(
+                "generation_complete",
+                {
+                    "item_id": item_id,
+                    "total_duration_ms": total_duration_ms,
+                },
+            )
+        except Exception as e:
+            print(f"YouTube download failed for item {item_id}: {e}")
+            broadcast_sse("generation_cancelled", {"item_id": item_id})
+        finally:
+            close_db()
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _get_audio_duration_ms(path):
+    import subprocess
+
+    result = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return float(result.stdout.strip()) * 1000
 
 
 # --- Discovery ---
@@ -1047,6 +1190,9 @@ def _split(text):
 def _re_extract(item):
     """Re-extract text from the original source. Returns dict with updated
     fields or None if re-extraction isn't possible."""
+    if item.get("source_type") == "youtube":
+        return None
+
     import tempfile
     import urllib.request
 

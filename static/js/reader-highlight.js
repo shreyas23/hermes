@@ -67,7 +67,9 @@ export function renderContent(item) {
   autoFollow = appSettings.autoScroll;
   followBtn.classList.remove('is-visible');
 
-  if (item.reader_html) {
+  if (item.source_type === 'youtube' && item.sentences.length === 1) {
+    container.innerHTML = '<div class="reader__no-transcript"><p>No transcript available for this video.</p><p>Audio playback works — use the player controls below.</p></div>';
+  } else if (item.reader_html) {
     container.innerHTML = item.reader_html;
   } else {
     item.sentences.forEach((text, i) => {

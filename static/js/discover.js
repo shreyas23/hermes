@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { confirmAction } from './confirm-modal.js';
-import { escHtml } from './utils.js';
+import { escHtml, isYouTubeUrl } from './utils.js';
 import { toastError, toastSuccess } from './toast.js';
 
 // Discovery is split into three layers so the modal can be promoted to a
@@ -72,14 +72,15 @@ async function addToLibrary(url, btn) {
   btn.disabled = true;
   btn.textContent = 'Adding…';
 
-  let data = await api('/api/import/url', { body: { url }, showError: false });
+  const endpoint = isYouTubeUrl(url) ? '/api/import/youtube' : '/api/import/url';
+  let data = await api(endpoint, { body: { url }, showError: false });
   if (data.error === 'duplicate') {
     const title = data.existing?.title || 'an existing item';
     if (!await confirmAction({ title: 'Duplicate item', message: `Already in your library as "${title}". Add again?`, confirmLabel: 'Add anyway', destructive: false })) {
       btn.disabled = false; btn.textContent = 'Add';
       return;
     }
-    data = await api('/api/import/url', { body: { url, force: true }, showError: false });
+    data = await api(endpoint, { body: { url, force: true }, showError: false });
   }
   if (data.error) {
     toastError(data.error);

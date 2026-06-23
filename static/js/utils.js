@@ -14,6 +14,10 @@ export function escHtml(str) {
   return el.innerHTML;
 }
 
+export function isYouTubeUrl(url) {
+  return /^https?:\/\/(www\.|m\.)?(youtube\.com\/(watch|shorts|embed|v\/)|youtu\.be\/)/i.test(url);
+}
+
 export function timeAgo(epochSec) {
   const diff = Date.now() / 1000 - epochSec;
   if (diff < 60) return 'just now';
