@@ -33,8 +33,7 @@ jobs:
             dist/Hermes.dmg \
             dist/Hermes.app
 
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: Hermes.dmg
-          path: dist/Hermes.dmg
+      - name: Upload DMG to release
+        run: gh release upload "${{ github.ref_name }}" dist/Hermes.dmg --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

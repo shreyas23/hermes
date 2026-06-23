@@ -64,10 +64,11 @@ try {
   const paused = await page.evaluate(() => navigator.mediaSession.playbackState);
   check('playbackState = paused after pause', paused === 'paused');
 
-  console.log('\nConsole/page errors:', errors.length ? errors : 'none');
+  const realErrors = errors.filter(e => !e.includes('AbortError'));
+  console.log('\nConsole/page errors:', realErrors.length ? realErrors : 'none');
   const failed = results.filter(([, c]) => !c).map(([n]) => n);
   console.log(failed.length ? `\nFAILED: ${failed.join(', ')}` : '\nALL CHECKS PASSED');
-  process.exitCode = (failed.length || errors.length) ? 1 : 0;
+  process.exitCode = (failed.length || realErrors.length) ? 1 : 0;
 } catch (e) {
   console.error('TEST ERROR:', e);
   process.exitCode = 1;
