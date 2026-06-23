@@ -38,11 +38,12 @@ def save_library_dir(path):
 
 
 def _set_paths(lib_dir):
-    global LIBRARY_DIR, DB_PATH, AUDIO_DIR, IMAGES_DIR
+    global LIBRARY_DIR, DB_PATH, AUDIO_DIR, IMAGES_DIR, THEMES_DIR
     LIBRARY_DIR = lib_dir
     DB_PATH = os.path.join(LIBRARY_DIR, "library.db")
     AUDIO_DIR = os.path.join(LIBRARY_DIR, "audio")
     IMAGES_DIR = os.path.join(LIBRARY_DIR, "images")
+    THEMES_DIR = os.path.join(LIBRARY_DIR, "themes")
 
 
 _set_paths(_load_library_dir())
@@ -56,6 +57,7 @@ def init_db():
     os.makedirs(LIBRARY_DIR, exist_ok=True)
     os.makedirs(AUDIO_DIR, exist_ok=True)
     os.makedirs(IMAGES_DIR, exist_ok=True)
+    os.makedirs(THEMES_DIR, exist_ok=True)
     with get_db() as db:
         db.executescript("""
             CREATE TABLE IF NOT EXISTS items (
@@ -560,6 +562,16 @@ DEFAULTS = {
     "kokoro-mlx_voice": "af_heart",
     "piper_voice": "en_US-lessac-medium",
     "pdf_tables": "off",
+    "skip_interval": "15",
+    "default_speed": "1",
+    "reader_font_size": "15",
+    "reader_line_height": "1.8",
+    "reader_max_width": "720",
+    "audio_bitrate": "64000",
+    "watch_interval": "30",
+    "sentence_pause_ms": "100",
+    "save_interval": "30000",
+    "auto_scroll": "on",
 }
 
 
@@ -600,3 +612,41 @@ def item_master_m4a(item_id):
 
 def item_images_dir(item_id):
     return os.path.join(IMAGES_DIR, str(item_id))
+
+
+BUILTIN_DESIGNS = [
+    {"id": "glass", "name": "Glass", "builtin": True},
+    {"id": "aurora", "name": "Soft Aurora", "builtin": True},
+    {"id": "ink", "name": "Ink & Paper", "builtin": True},
+]
+
+
+def get_custom_themes():
+    themes = []
+    if not os.path.isdir(THEMES_DIR):
+        return themes
+    for entry in sorted(os.listdir(THEMES_DIR)):
+        theme_dir = os.path.join(THEMES_DIR, entry)
+        if not os.path.isdir(theme_dir):
+            continue
+        manifest_path = os.path.join(theme_dir, "manifest.json")
+        css_path = os.path.join(theme_dir, "theme.css")
+        if not os.path.isfile(manifest_path) or not os.path.isfile(css_path):
+            continue
+        try:
+            with open(manifest_path, "r") as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not manifest.get("name"):
+            continue
+        themes.append(
+            {
+                "id": entry,
+                "name": manifest["name"],
+                "version": manifest.get("version", "1.0"),
+                "author": manifest.get("author", ""),
+                "builtin": False,
+            }
+        )
+    return themes

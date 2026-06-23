@@ -21,6 +21,7 @@ from extractors import (
     map_images_to_sentences,
 )
 from models import (
+    BUILTIN_DESIGNS,
     add_bookmark,
     add_feed,
     add_item,
@@ -37,6 +38,7 @@ from models import (
     get_all_settings,
     get_bookmarks,
     get_collections,
+    get_custom_themes,
     get_feeds,
     get_in_progress,
     get_item,
@@ -657,6 +659,16 @@ _ALLOWED_SETTINGS = {
     "piper_voice",
     "theme",
     "design",
+    "skip_interval",
+    "default_speed",
+    "reader_font_size",
+    "reader_line_height",
+    "reader_max_width",
+    "audio_bitrate",
+    "watch_interval",
+    "sentence_pause_ms",
+    "save_interval",
+    "auto_scroll",
 }
 
 
@@ -667,6 +679,27 @@ def settings_update():
         if key in _ALLOWED_SETTINGS:
             set_setting(key, value)
     return jsonify(get_all_settings())
+
+
+# --- Themes ---
+
+
+@app.route("/api/themes", methods=["GET"])
+def list_themes():
+    return jsonify({"themes": BUILTIN_DESIGNS + get_custom_themes()})
+
+
+@app.route("/api/themes/<name>/theme.css")
+def theme_css(name):
+    import models as _m
+
+    theme_dir = os.path.realpath(os.path.join(_m.THEMES_DIR, name))
+    if not theme_dir.startswith(os.path.realpath(_m.THEMES_DIR) + os.sep):
+        return jsonify({"error": "Invalid path"}), 403
+    css_path = os.path.join(theme_dir, "theme.css")
+    if not os.path.isfile(css_path):
+        return jsonify({"error": "Theme not found"}), 404
+    return send_file(css_path, mimetype="text/css")
 
 
 # --- Watch folders ---
@@ -718,7 +751,11 @@ def _watch_folder_scanner():
                 update_watch_folder_scanned(folder["id"])
         except Exception:
             pass
-        time.sleep(30)
+        try:
+            interval = int(get_setting("watch_interval") or 30)
+        except (TypeError, ValueError):
+            interval = 30
+        time.sleep(interval)
 
 
 @app.route("/api/voices", methods=["GET"])

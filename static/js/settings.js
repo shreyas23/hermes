@@ -22,6 +22,36 @@ let cachedEdgeVoices = null;
 let cachedSayVoices = null;
 let cachedKokoroVoices = null;
 let cachedPiperVoices = null;
+let cachedThemes = null;
+
+function loadCustomThemeCss(designId) {
+  const existing = document.getElementById('custom-theme-css');
+  if (window.__BUILTIN_DESIGNS.includes(designId)) {
+    if (existing) existing.remove();
+    return;
+  }
+  const href = '/api/themes/' + encodeURIComponent(designId) + '/theme.css';
+  if (existing) {
+    existing.href = href;
+  } else {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.id = 'custom-theme-css';
+    document.head.appendChild(link);
+  }
+}
+
+function populateThemes(themes, currentValue) {
+  designSelect.innerHTML = '';
+  for (const theme of themes) {
+    const opt = document.createElement('option');
+    opt.value = theme.id;
+    opt.textContent = theme.name + (theme.author ? ` — ${theme.author}` : '');
+    designSelect.appendChild(opt);
+  }
+  designSelect.value = currentValue;
+}
 
 function updateVoiceGroups(engine) {
   edgeGroup.classList.toggle('is-hidden', engine !== 'edge');
@@ -40,14 +70,18 @@ export function initSettings() {
   engineSelect.addEventListener('change', () => updateVoiceGroups(engineSelect.value));
 
   designSelect.addEventListener('change', () => {
-    document.documentElement.setAttribute('data-design', designSelect.value);
-    localStorage.setItem('hermes-design', designSelect.value);
-    api('/api/settings', { body: { design: designSelect.value } });
+    const id = designSelect.value;
+    loadCustomThemeCss(id);
+    document.documentElement.setAttribute('data-design', id);
+    localStorage.setItem('hermes-design', id);
+    api('/api/settings', { body: { design: id } });
   });
 
   updateThemeIcon();
   themeBtn.addEventListener('click', toggleTheme);
   initLibraryPath();
+  initRangeInputs();
+  loadAndApplySettings();
 }
 
 function populateSelect(select, voices, labelFn) {
@@ -66,16 +100,18 @@ async function open() {
   loadCache();
   loadLibraryPath();
 
-  const [settings, edgeVoices, sayVoices, kokoroVoices, piperVoices] = await Promise.all([
+  const [settings, edgeVoices, sayVoices, kokoroVoices, piperVoices, themes] = await Promise.all([
     api('/api/settings'),
     cachedEdgeVoices ?? api('/api/voices?engine=edge').then(r => (cachedEdgeVoices = r.voices)),
     cachedSayVoices ?? api('/api/voices?engine=say').then(r => (cachedSayVoices = r.voices)),
     cachedKokoroVoices ?? api('/api/voices?engine=kokoro').then(r => (cachedKokoroVoices = r.voices)),
     cachedPiperVoices ?? api('/api/voices?engine=piper').then(r => (cachedPiperVoices = r.voices)),
+    cachedThemes ?? api('/api/themes').then(r => (cachedThemes = r.themes)),
   ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
-  designSelect.value = settings.design || localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
+  const currentDesign = settings.design || localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
+  if (themes) populateThemes(themes, currentDesign);
 
   if (edgeVoices) populateSelect(edgeVoiceSelect, edgeVoices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';
@@ -95,6 +131,17 @@ async function open() {
   piperVoiceSelect.value = settings.piper_voice || 'en_US-lessac-medium';
 
   updateVoiceGroups(engineSelect.value);
+
+  setRange('setting-skip-interval', settings.skip_interval || '15', v => `${v}s`);
+  document.getElementById('setting-default-speed').value = settings.default_speed || '1';
+  document.getElementById('setting-auto-scroll').value = settings.auto_scroll || 'on';
+  setRange('setting-font-size', settings.reader_font_size || '15', v => `${v}px`);
+  setRange('setting-line-height', settings.reader_line_height || '1.8', v => v);
+  setRange('setting-max-width', settings.reader_max_width || '720', v => `${v}px`);
+  document.getElementById('setting-audio-bitrate').value = settings.audio_bitrate || '64000';
+  setRange('setting-sentence-pause', settings.sentence_pause_ms || '100', v => `${v}ms`);
+  setRange('setting-watch-interval', settings.watch_interval || '30', v => `${v}s`);
+  setRange('setting-save-interval', settings.save_interval || '30000', v => `${Math.round(v / 1000)}s`);
 }
 
 function close() {
@@ -136,8 +183,19 @@ async function save() {
       kokoro_voice: kokoroVoiceSelect.value,
       'kokoro-mlx_voice': kokoroMlxVoiceSelect.value,
       piper_voice: piperVoiceSelect.value,
+      skip_interval: document.getElementById('setting-skip-interval').value,
+      default_speed: document.getElementById('setting-default-speed').value,
+      auto_scroll: document.getElementById('setting-auto-scroll').value,
+      reader_font_size: document.getElementById('setting-font-size').value,
+      reader_line_height: document.getElementById('setting-line-height').value,
+      reader_max_width: document.getElementById('setting-max-width').value,
+      audio_bitrate: document.getElementById('setting-audio-bitrate').value,
+      sentence_pause_ms: document.getElementById('setting-sentence-pause').value,
+      watch_interval: document.getElementById('setting-watch-interval').value,
+      save_interval: document.getElementById('setting-save-interval').value,
     }
   });
+  applyReaderSettings();
   toastSuccess('Settings saved');
   close();
 }
@@ -317,4 +375,58 @@ export function handleTransferProgress(data) {
     text.textContent = `Transfer failed: ${data.message}`;
     fill.style.width = '0%';
   }
+}
+
+
+export const appSettings = {
+  skipInterval: 15,
+  defaultSpeed: 1.0,
+  autoScroll: true,
+  saveInterval: 30000,
+};
+
+function setRange(id, value, fmtFn) {
+  const input = document.getElementById(id);
+  const label = document.getElementById(id + '-val');
+  if (input) input.value = value;
+  if (label) label.textContent = fmtFn(value);
+}
+
+function initRangeInputs() {
+  const ranges = [
+    ['setting-skip-interval', v => `${v}s`],
+    ['setting-font-size', v => `${v}px`],
+    ['setting-line-height', v => v],
+    ['setting-max-width', v => `${v}px`],
+    ['setting-sentence-pause', v => `${v}ms`],
+    ['setting-watch-interval', v => `${v}s`],
+    ['setting-save-interval', v => `${Math.round(v / 1000)}s`],
+  ];
+  for (const [id, fmt] of ranges) {
+    const input = document.getElementById(id);
+    const label = document.getElementById(id + '-val');
+    if (input && label) {
+      input.addEventListener('input', () => { label.textContent = fmt(input.value); });
+    }
+  }
+}
+
+async function loadAndApplySettings() {
+  const s = await api('/api/settings', { showError: false });
+  if (!s || s.error) return;
+  appSettings.skipInterval = parseInt(s.skip_interval) || 15;
+  appSettings.defaultSpeed = parseFloat(s.default_speed) || 1.0;
+  appSettings.autoScroll = s.auto_scroll !== 'off';
+  appSettings.saveInterval = parseInt(s.save_interval) || 30000;
+  applyReaderSettings(s);
+}
+
+function applyReaderSettings(s) {
+  const root = document.documentElement;
+  const fontSize = s?.reader_font_size || document.getElementById('setting-font-size')?.value || '15';
+  const lineHeight = s?.reader_line_height || document.getElementById('setting-line-height')?.value || '1.8';
+  const maxWidth = s?.reader_max_width || document.getElementById('setting-max-width')?.value || '720';
+  root.style.setProperty('--reader-font-size', `${fontSize}px`);
+  root.style.setProperty('--reader-line-height', lineHeight);
+  root.style.setProperty('--reader-max-width', `${maxWidth}px`);
 }

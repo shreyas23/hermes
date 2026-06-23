@@ -10,8 +10,16 @@
       || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', t);
     window.__DEFAULT_DESIGN = '{{ default_design }}';
+    window.__BUILTIN_DESIGNS = ['glass', 'aurora', 'ink'];
     const d = localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
     document.documentElement.setAttribute('data-design', d);
+    if (!window.__BUILTIN_DESIGNS.includes(d)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/api/themes/' + encodeURIComponent(d) + '/theme.css';
+      link.id = 'custom-theme-css';
+      document.head.appendChild(link);
+    }
   </script>
   <link rel="stylesheet" href="/static/css/layout.css">
   <link rel="stylesheet" href="/static/css/components.css">
@@ -377,6 +385,97 @@
         <div class="settings-group is-hidden" id="piper-voice-group">
           <label class="settings-label" for="setting-piper-voice">Piper Voice</label>
           <select class="settings-select" id="setting-piper-voice"></select>
+        </div>
+      </div>
+
+      <!-- Playback -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Playback</h3>
+        <div class="settings-group">
+          <label class="settings-label">Default Speed</label>
+          <select class="settings-select" id="setting-default-speed">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1">1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Skip Interval</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-skip-interval" min="5" max="60" step="5">
+            <span class="settings-range__value" id="setting-skip-interval-val">15s</span>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Auto-scroll with playback</label>
+          <select class="settings-select" id="setting-auto-scroll">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Reading -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Reading</h3>
+        <div class="settings-group">
+          <label class="settings-label">Font Size</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-font-size" min="12" max="24" step="1">
+            <span class="settings-range__value" id="setting-font-size-val">15px</span>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Line Spacing</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-line-height" min="1.2" max="2.4" step="0.1">
+            <span class="settings-range__value" id="setting-line-height-val">1.8</span>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Content Width</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-max-width" min="500" max="1200" step="20">
+            <span class="settings-range__value" id="setting-max-width-val">720px</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Advanced</h3>
+        <div class="settings-group">
+          <label class="settings-label">Audio Bitrate</label>
+          <select class="settings-select" id="setting-audio-bitrate">
+            <option value="32000">32 kbps (smaller files)</option>
+            <option value="64000">64 kbps (default)</option>
+            <option value="96000">96 kbps</option>
+            <option value="128000">128 kbps (higher quality)</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Sentence Pause</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-sentence-pause" min="0" max="500" step="25">
+            <span class="settings-range__value" id="setting-sentence-pause-val">100ms</span>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Watch Folder Interval</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-watch-interval" min="10" max="300" step="10">
+            <span class="settings-range__value" id="setting-watch-interval-val">30s</span>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label">Progress Save Interval</label>
+          <div class="settings-range">
+            <input type="range" class="settings-range__input" id="setting-save-interval" min="5000" max="120000" step="5000">
+            <span class="settings-range__value" id="setting-save-interval-val">30s</span>
+          </div>
         </div>
       </div>
 

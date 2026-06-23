@@ -13,6 +13,7 @@ def isolated_db(tmp_path):
     models.DB_PATH = str(tmp_path / "test.db")
     models.AUDIO_DIR = str(tmp_path / "audio")
     models.IMAGES_DIR = str(tmp_path / "images")
+    models.THEMES_DIR = str(tmp_path / "themes")
     models.init_db()
     yield tmp_path
     models.close_db()

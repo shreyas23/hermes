@@ -185,3 +185,58 @@ def test_settings_unknown_key_ignored(client):
     resp = client.post("/api/settings", json={"fake_key": "value"})
     assert resp.status_code == 200
     assert "fake_key" not in client.get("/api/settings").get_json()
+
+
+# --- Themes ---
+
+
+def test_themes_list_returns_builtins(client):
+    resp = client.get("/api/themes")
+    assert resp.status_code == 200
+    themes = resp.get_json()["themes"]
+    ids = [t["id"] for t in themes]
+    assert "glass" in ids
+    assert "aurora" in ids
+    assert "ink" in ids
+    assert all(t["builtin"] for t in themes if t["id"] in ("glass", "aurora", "ink"))
+
+
+def test_themes_list_includes_custom(client, isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "monokai"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text(json.dumps({"name": "Monokai", "version": "1.0", "author": "Test"}))
+    (theme_dir / "theme.css").write_text('[data-design="monokai"] { --accent: #f92672; }')
+
+    resp = client.get("/api/themes")
+    themes = resp.get_json()["themes"]
+    custom = [t for t in themes if t["id"] == "monokai"]
+    assert len(custom) == 1
+    assert custom[0]["name"] == "Monokai"
+    assert custom[0]["builtin"] is False
+
+
+def test_theme_css_serves_file(client, isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "monokai"
+    theme_dir.mkdir(parents=True)
+    css_content = '[data-design="monokai"] { --accent: #f92672; }'
+    (theme_dir / "manifest.json").write_text(json.dumps({"name": "Monokai"}))
+    (theme_dir / "theme.css").write_text(css_content)
+
+    resp = client.get("/api/themes/monokai/theme.css")
+    assert resp.status_code == 200
+    assert "text/css" in resp.headers["Content-Type"]
+    assert css_content.encode() in resp.data
+
+
+def test_theme_css_missing_is_404(client):
+    resp = client.get("/api/themes/nonexistent/theme.css")
+    assert resp.status_code == 404
+
+
+def test_theme_css_path_traversal_blocked(client):
+    resp = client.get("/api/themes/..%2F..%2Fetc%2Fpasswd/theme.css")
+    assert resp.status_code in (403, 404)

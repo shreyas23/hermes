@@ -492,7 +492,7 @@
 }
 
 .reader__scroll > * {
-  max-width: 720px;
+  max-width: var(--reader-max-width, 720px);
   width: 100%;
 }
 
@@ -527,8 +527,8 @@
 
 .reader__scroll p,
 .reader__paragraph {
-  font-size: var(--text-base);
-  line-height: 1.8;
+  font-size: var(--reader-font-size, var(--text-base));
+  line-height: var(--reader-line-height, 1.8);
   color: var(--text-primary);
   margin-bottom: var(--space-4);
 }
@@ -562,7 +562,7 @@
 .reader__scroll ol {
   margin: var(--space-4) 0;
   padding-left: var(--space-6);
-  line-height: 1.8;
+  line-height: var(--reader-line-height, 1.8);
 }
 
 .reader__scroll li {
@@ -1688,6 +1688,40 @@ mark.search-hit.is-current {
   color: var(--text-tertiary);
   margin-bottom: var(--space-2);
   line-height: var(--line-height);
+}
+
+/* Range slider */
+.settings-range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-range__input {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--glass-inset);
+  border-radius: 2px;
+  outline: none;
+}
+
+.settings-range__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.settings-range__value {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-width: 50px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Library path */

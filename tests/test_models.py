@@ -277,3 +277,57 @@ def test_delete_bookmark(sample_item):
     bm_id = models.add_bookmark(item_id, 1, quote="test")
     models.delete_bookmark(bm_id)
     assert models.get_bookmarks(item_id) == []
+
+
+# --- Custom themes ---
+
+
+def test_get_custom_themes_empty(isolated_db):
+    assert models.get_custom_themes() == []
+
+
+def test_get_custom_themes_valid_theme(isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "nord"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text(json.dumps({"name": "Nord", "version": "2.0", "author": "Arctic"}))
+    (theme_dir / "theme.css").write_text('[data-design="nord"] { --accent: #88c0d0; }')
+
+    themes = models.get_custom_themes()
+    assert len(themes) == 1
+    assert themes[0]["id"] == "nord"
+    assert themes[0]["name"] == "Nord"
+    assert themes[0]["version"] == "2.0"
+    assert themes[0]["author"] == "Arctic"
+    assert themes[0]["builtin"] is False
+
+
+def test_get_custom_themes_skips_missing_css(isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "broken"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text(json.dumps({"name": "Broken"}))
+
+    assert models.get_custom_themes() == []
+
+
+def test_get_custom_themes_skips_invalid_manifest(isolated_db):
+    theme_dir = isolated_db / "themes" / "bad"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text("not json!")
+    (theme_dir / "theme.css").write_text("body {}")
+
+    assert models.get_custom_themes() == []
+
+
+def test_get_custom_themes_skips_nameless_manifest(isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "nameless"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text(json.dumps({"version": "1.0"}))
+    (theme_dir / "theme.css").write_text("body {}")
+
+    assert models.get_custom_themes() == []

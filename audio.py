@@ -157,8 +157,11 @@ def _cleanup_partial(audio_dir, count):
 
 
 def _convert_to_m4a(wav_path, m4a_path):
+    from models import get_setting
+
+    bitrate = get_setting("audio_bitrate") or "64000"
     subprocess.run(
-        ["afconvert", "-f", "m4af", "-d", "aac", "-b", "64000", wav_path, m4a_path],
+        ["afconvert", "-f", "m4af", "-d", "aac", "-b", bitrate, wav_path, m4a_path],
         check=True,
         capture_output=True,
         timeout=300,
@@ -166,15 +169,18 @@ def _convert_to_m4a(wav_path, m4a_path):
 
 
 def _concatenate_wavs(audio_dir, count, output_path):
+    from models import get_setting
+
+    pause_ms = int(get_setting("sentence_pause_ms") or 100)
     params_set = False
     framerate = 22050
     with wave.open(output_path, "wb") as out:
         for i in range(count):
             sent_path = os.path.join(audio_dir, f"sent_{i:04d}.wav")
             if not os.path.exists(sent_path):
-                if params_set:
-                    # 100ms silence at the master framerate, 16-bit mono
-                    out.writeframes(b"\x00" * (framerate * 2 // 10))
+                if params_set and pause_ms > 0:
+                    silence_frames = int(framerate * 2 * pause_ms / 1000)
+                    out.writeframes(b"\x00" * silence_frames)
                 continue
             with wave.open(sent_path, "rb") as inp:
                 if not params_set:

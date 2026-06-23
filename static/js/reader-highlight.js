@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { appSettings } from './settings.js';
 
 const container = document.getElementById('reader-content');
 const followBtn = document.getElementById('btn-follow');
@@ -8,7 +9,7 @@ const readerView = document.getElementById('reader-view');
 const teleprompterBtn = document.getElementById('btn-teleprompter');
 const appEl = document.getElementById('app');
 
-let autoFollow = true;
+let autoFollow = appSettings.autoScroll;
 let programmaticScroll = false;
 let userScrollTimeout = null;
 let lastHighlightedIndex = -1;
@@ -27,7 +28,7 @@ export function initReaderHighlight(onSentenceClick) {
   }, { passive: true });
 
   followBtn.addEventListener('click', () => {
-    autoFollow = true;
+    autoFollow = appSettings.autoScroll;
     followBtn.classList.remove('is-visible');
     scrollToActive();
   });
@@ -51,7 +52,7 @@ export function toggleTeleprompter() {
   teleprompterActive = !teleprompterActive;
   appEl.classList.toggle('app--teleprompter', teleprompterActive);
   teleprompterBtn.classList.toggle('is-active', teleprompterActive);
-  autoFollow = true;
+  autoFollow = appSettings.autoScroll;
   followBtn.classList.remove('is-visible');
   lastHighlightedIndex = -1;
   highlightCurrentSentence();
@@ -63,7 +64,7 @@ export function renderContent(item) {
   sentenceElements = [];
   lastHighlightedIndex = -1;
   selectedSentenceIndex = 0;
-  autoFollow = true;
+  autoFollow = appSettings.autoScroll;
   followBtn.classList.remove('is-visible');
 
   if (item.reader_html) {
@@ -213,7 +214,7 @@ function scrollToActive() {
   const offset = teleprompterActive ? containerRect.height / 2 - elRect.height / 2 : containerRect.height / 3;
   const target = container.scrollTop + elRect.top - containerRect.top - offset;
 
-  autoFollow = true;
+  autoFollow = appSettings.autoScroll;
 
   if (teleprompterActive) {
     animateScroll(target);
@@ -236,7 +237,7 @@ function updateFollowButton() {
   const isVisible = elRect.top >= containerRect.top && elRect.bottom <= containerRect.bottom;
 
   if (isVisible) {
-    autoFollow = true;
+    autoFollow = appSettings.autoScroll;
     followBtn.classList.remove('is-visible');
   } else {
     followBtn.classList.add('is-visible');

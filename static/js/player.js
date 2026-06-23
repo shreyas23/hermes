@@ -4,6 +4,7 @@ import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } fr
 import { formatTime } from './utils.js';
 import { advanceQueue } from './queue.js';
 import { checkEndOfItem } from './sleep-timer.js';
+import { appSettings } from './settings.js';
 
 const btnPlay = document.getElementById('btn-play');
 const btnPause = document.getElementById('btn-pause');
@@ -76,12 +77,12 @@ export function initPlayer() {
   });
 
   btnBack15.addEventListener('click', () => {
-    state.audio.currentTime = Math.max(0, state.audio.currentTime - 15);
+    state.audio.currentTime = Math.max(0, state.audio.currentTime - appSettings.skipInterval);
     highlightCurrentSentence();
   });
 
   btnFwd15.addEventListener('click', () => {
-    state.audio.currentTime = Math.min(state.audio.duration || 0, state.audio.currentTime + 15);
+    state.audio.currentTime = Math.min(state.audio.duration || 0, state.audio.currentTime + appSettings.skipInterval);
     highlightCurrentSentence();
   });
 
@@ -186,6 +187,10 @@ export function initPlayer() {
 
 export function loadAudio(item) {
   if (canplayAbort) canplayAbort.abort();
+  if (!state.playingItemId) {
+    const idx = SPEED_OPTIONS.indexOf(appSettings.defaultSpeed);
+    if (idx !== -1) state.speedIndex = idx;
+  }
 
   timeTotal.textContent = formatTime(item.total_duration_ms);
   timeCurrent.textContent = '0:00';
@@ -329,7 +334,7 @@ export function saveProgress() {
 
 function startProgressSave() {
   stopProgressSave();
-  state.progressSaveInterval = setInterval(saveProgress, 30000);
+  state.progressSaveInterval = setInterval(saveProgress, appSettings.saveInterval);
 }
 
 function stopProgressSave() {
