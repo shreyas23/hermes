@@ -627,7 +627,7 @@
 
 /* Reading highlight — sentence-level */
 [data-si] {
-  cursor: pointer;
+  cursor: text;
   border-radius: var(--radius-sm);
 }
 

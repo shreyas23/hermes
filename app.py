@@ -1349,6 +1349,7 @@ if __name__ == "__main__":
         width=1100,
         height=750,
         min_size=(800, 500),
+        text_select=True,
     )
 
     def _on_closing():

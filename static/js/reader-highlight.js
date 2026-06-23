@@ -1,5 +1,7 @@
 import { state } from './state.js';
 import { appSettings } from './settings.js';
+import { showContextMenu } from './contextmenu.js';
+import { toastSuccess } from './toast.js';
 
 const container = document.getElementById('reader-content');
 const followBtn = document.getElementById('btn-follow');
@@ -34,10 +36,43 @@ export function initReaderHighlight(onSentenceClick) {
   });
 
   container.addEventListener('click', (e) => {
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim()) return;
     const el = e.target.closest('[data-si]');
     if (!el) return;
     selectedSentenceIndex = parseInt(el.dataset.si);
     if (onSentenceClick) onSentenceClick(selectedSentenceIndex);
+  });
+
+  container.addEventListener('contextmenu', (e) => {
+    const sel = window.getSelection();
+    const selectedText = sel ? sel.toString().trim() : '';
+    const sentenceEl = e.target.closest('[data-si]');
+
+    const actions = [];
+
+    if (selectedText) {
+      actions.push({
+        label: 'Copy',
+        onClick: () => {
+          navigator.clipboard.writeText(selectedText);
+          toastSuccess('Copied to clipboard');
+        },
+      });
+    }
+
+    if (sentenceEl) {
+      actions.push({
+        label: 'Copy sentence',
+        onClick: () => {
+          navigator.clipboard.writeText(sentenceEl.textContent.trim());
+          toastSuccess('Sentence copied');
+        },
+      });
+    }
+
+    if (actions.length === 0) return;
+    showContextMenu(e, actions);
   });
 
   tocBtn.addEventListener('click', () => {
