@@ -5,7 +5,7 @@ import { initReaderHighlight, renderContent, toggleTeleprompter } from './reader
 import { initPlayer, play, pause, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
 import { initDiscover } from './discover.js';
-import { initSettings } from './settings.js';
+import { initSettings, handleTransferProgress } from './settings.js';
 import { initConfirm } from './confirm-modal.js';
 import { initSearch, resetSearch } from './search.js';
 import { initBookmarks, loadBookmarks, resetBookmarks, addCurrent as addBookmark } from './bookmarks.js';
@@ -217,6 +217,18 @@ connectSSE({
   },
   watch_folder_import: () => {
     loadView(state.currentView);
+    loadDashboard();
+  },
+  library_transfer: (data) => {
+    handleTransferProgress(data);
+  },
+  library_changed: () => {
+    stop();
+    state.currentItemId = null;
+    state.currentItem = null;
+    showView('empty');
+    loadView('recent');
+    loadCollections();
     loadDashboard();
   },
 });

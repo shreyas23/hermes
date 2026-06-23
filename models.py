@@ -5,12 +5,51 @@ import threading
 import time
 from contextlib import contextmanager
 
-LIBRARY_DIR = os.path.expanduser("~/hermes-library")
-DB_PATH = os.path.join(LIBRARY_DIR, "library.db")
-AUDIO_DIR = os.path.join(LIBRARY_DIR, "audio")
-IMAGES_DIR = os.path.join(LIBRARY_DIR, "images")
+CONFIG_DIR = os.path.expanduser("~/.config/hermes")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+_DEFAULT_LIBRARY_DIR = os.path.expanduser("~/hermes-library")
+
+
+def _load_library_dir():
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            cfg = json.load(f)
+            path = cfg.get("library_dir", "").strip()
+            if path:
+                return os.path.expanduser(path)
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    return _DEFAULT_LIBRARY_DIR
+
+
+def save_library_dir(path):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    cfg = {}
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            cfg = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    cfg["library_dir"] = path
+    tmp = CONFIG_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=2)
+    os.replace(tmp, CONFIG_PATH)
+
+
+def _set_paths(lib_dir):
+    global LIBRARY_DIR, DB_PATH, AUDIO_DIR, IMAGES_DIR
+    LIBRARY_DIR = lib_dir
+    DB_PATH = os.path.join(LIBRARY_DIR, "library.db")
+    AUDIO_DIR = os.path.join(LIBRARY_DIR, "audio")
+    IMAGES_DIR = os.path.join(LIBRARY_DIR, "images")
+
+
+_set_paths(_load_library_dir())
 
 _local = threading.local()
+_db_version = 0
+_path_lock = threading.Lock()
 
 
 def init_db():
@@ -106,13 +145,19 @@ def init_db():
 @contextmanager
 def get_db():
     conn = getattr(_local, "conn", None)
-    if conn is None:
-        conn = sqlite3.connect(DB_PATH)
+    ver = getattr(_local, "db_version", -1)
+    if conn is None or ver != _db_version:
+        if conn is not None:
+            conn.close()
+        with _path_lock:
+            db_path = DB_PATH
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA busy_timeout = 5000")
         _local.conn = conn
+        _local.db_version = _db_version
     try:
         yield conn
         conn.commit()
@@ -126,6 +171,16 @@ def close_db():
     if conn is not None:
         conn.close()
         _local.conn = None
+
+
+def switch_library(new_dir):
+    global _db_version
+    close_db()
+    with _path_lock:
+        _set_paths(new_dir)
+    save_library_dir(new_dir)
+    init_db()
+    _db_version += 1
 
 
 def add_item(

@@ -3,11 +3,14 @@ import threading
 import wave
 from pathlib import Path
 
+import models
 from engines import register
 from engines.base import TTSEngine, wav_duration_ms
-from models import LIBRARY_DIR
 
-PIPER_DIR = Path(LIBRARY_DIR) / "models" / "piper"
+
+def _piper_dir():
+    return Path(models.LIBRARY_DIR) / "models" / "piper"
+
 
 _DEFAULT_VOICES = [
     "en_US-lessac-medium",
@@ -56,10 +59,10 @@ class PiperEngine(TTSEngine):
             from piper import PiperVoice
             from piper.download_voices import download_voice
 
-            model_path = PIPER_DIR / f"{voice_id}.onnx"
+            model_path = _piper_dir() / f"{voice_id}.onnx"
             if not model_path.exists():
-                PIPER_DIR.mkdir(parents=True, exist_ok=True)
-                download_voice(voice_id, PIPER_DIR)
+                _piper_dir().mkdir(parents=True, exist_ok=True)
+                download_voice(voice_id, _piper_dir())
 
             voice = PiperVoice.load(str(model_path))
             self._voices[voice_id] = voice

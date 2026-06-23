@@ -1,5 +1,6 @@
 import { api } from './api.js';
-import { toastSuccess } from './toast.js';
+import { confirmAction } from './confirm-modal.js';
+import { toastError, toastSuccess } from './toast.js';
 
 const modal = document.getElementById('settings-modal');
 const engineSelect = document.getElementById('setting-engine');
@@ -46,6 +47,7 @@ export function initSettings() {
 
   updateThemeIcon();
   themeBtn.addEventListener('click', toggleTheme);
+  initLibraryPath();
 }
 
 function populateSelect(select, voices, labelFn) {
@@ -62,6 +64,7 @@ async function open() {
   modal.classList.add('is-visible');
   loadStats();
   loadCache();
+  loadLibraryPath();
 
   const [settings, edgeVoices, sayVoices, kokoroVoices, piperVoices] = await Promise.all([
     api('/api/settings'),
@@ -96,6 +99,15 @@ async function open() {
 
 function close() {
   modal.classList.remove('is-visible');
+  const changeForm = document.getElementById('library-change-form');
+  const changeBtn = document.getElementById('library-change-btn');
+  if (changeForm) {
+    changeForm.classList.add('is-hidden');
+    changeBtn.classList.remove('is-hidden');
+    document.getElementById('library-change-apply').disabled = false;
+    document.getElementById('library-change-cancel').disabled = false;
+    document.getElementById('library-transfer-progress').classList.add('is-hidden');
+  }
 }
 
 function isDark() {
@@ -199,4 +211,110 @@ async function loadCache() {
       loadCache();
     });
   });
+}
+
+
+function initLibraryPath() {
+  const changeBtn = document.getElementById('library-change-btn');
+  const changeForm = document.getElementById('library-change-form');
+  const applyBtn = document.getElementById('library-change-apply');
+  const cancelBtn = document.getElementById('library-change-cancel');
+  const pathInput = document.getElementById('library-new-path');
+
+  changeBtn.addEventListener('click', () => {
+    changeForm.classList.remove('is-hidden');
+    changeBtn.classList.add('is-hidden');
+    pathInput.value = document.getElementById('library-path').textContent;
+    pathInput.focus();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    changeForm.classList.add('is-hidden');
+    changeBtn.classList.remove('is-hidden');
+  });
+
+  applyBtn.addEventListener('click', () => applyLibraryChange());
+}
+
+async function applyLibraryChange() {
+  const pathInput = document.getElementById('library-new-path');
+  const newPath = pathInput.value.trim();
+  const mode = document.querySelector('input[name="library-mode"]:checked').value;
+  const progress = document.getElementById('library-transfer-progress');
+  const applyBtn = document.getElementById('library-change-apply');
+  const cancelBtn = document.getElementById('library-change-cancel');
+
+  if (!newPath) {
+    toastError('Enter a path');
+    return;
+  }
+
+  const labels = { move: 'Move data to', copy: 'Copy data to', switch: 'Switch library to' };
+  const pastTense = { move: 'moved', copy: 'copied', switch: 'switched' };
+  if (!await confirmAction({
+    title: `${labels[mode]} new location?`,
+    message: newPath,
+    confirmLabel: mode === 'switch' ? 'Switch' : mode === 'move' ? 'Move' : 'Copy',
+    destructive: false,
+  })) return;
+
+  applyBtn.disabled = true;
+  cancelBtn.disabled = true;
+  if (mode !== 'switch') {
+    progress.classList.remove('is-hidden');
+    progress.querySelector('.settings-library__progress-text').textContent =
+      mode === 'move' ? 'Moving data...' : 'Copying data...';
+    document.getElementById('library-transfer-fill').style.width = '0%';
+  }
+
+  const result = await api('/api/library-path', { body: { path: newPath, mode } });
+
+  applyBtn.disabled = false;
+  cancelBtn.disabled = false;
+  if (result.error) {
+    if (result.path) {
+      document.getElementById('library-path').textContent = result.path;
+    }
+    setTimeout(() => progress.classList.add('is-hidden'), 2000);
+    return;
+  }
+
+  progress.classList.add('is-hidden');
+  toastSuccess(`Library ${pastTense[mode]} successfully`);
+  document.getElementById('library-path').textContent = result.path;
+  document.getElementById('library-change-form').classList.add('is-hidden');
+  document.getElementById('library-change-btn').classList.remove('is-hidden');
+
+  loadStats();
+  loadCache();
+}
+
+async function loadLibraryPath() {
+  const data = await api('/api/library-path', { showError: false });
+  if (data && data.path) {
+    document.getElementById('library-path').textContent = data.path;
+  }
+}
+
+export function handleTransferProgress(data) {
+  const progress = document.getElementById('library-transfer-progress');
+  const fill = document.getElementById('library-transfer-fill');
+  const text = progress.querySelector('.settings-library__progress-text');
+
+  if (data.status === 'started') {
+    progress.classList.remove('is-hidden');
+    fill.style.width = '0%';
+    text.textContent = data.mode === 'move' ? 'Moving data...' : 'Copying data...';
+  } else if (data.status === 'progress') {
+    const pct = Math.round((data.done / data.total) * 100);
+    fill.style.width = `${pct}%`;
+    text.textContent = `${data.mode === 'move' ? 'Moving' : 'Copying'} — ${pct}%`;
+  } else if (data.status === 'completed') {
+    fill.style.width = '100%';
+    text.textContent = 'Transfer complete';
+    setTimeout(() => progress.classList.add('is-hidden'), 1500);
+  } else if (data.status === 'error') {
+    text.textContent = `Transfer failed: ${data.message}`;
+    fill.style.width = '0%';
+  }
 }

@@ -285,6 +285,46 @@
       <button class="modal__close" title="Close" aria-label="Close">&times;</button>
       <h2 class="modal__title">Settings</h2>
 
+      <!-- Data Library -->
+      <div class="settings-section">
+        <h3 class="settings-section__title">Data Library</h3>
+        <div class="settings-library">
+          <div class="settings-library__current">
+            <span class="settings-library__label">Location</span>
+            <span class="settings-library__path" id="library-path">~/hermes-library</span>
+          </div>
+          <div class="settings-library__change is-hidden" id="library-change-form">
+            <input type="text" class="modal__input" id="library-new-path" placeholder="~/hermes-library">
+            <div class="settings-library__modes">
+              <label class="settings-library__mode">
+                <input type="radio" name="library-mode" value="move" checked>
+                <span>Move data</span>
+              </label>
+              <label class="settings-library__mode">
+                <input type="radio" name="library-mode" value="copy">
+                <span>Copy data</span>
+              </label>
+              <label class="settings-library__mode">
+                <input type="radio" name="library-mode" value="switch">
+                <span>Switch only</span>
+              </label>
+            </div>
+            <div class="settings-library__hint">Move transfers all data to the new location. Copy duplicates it. Switch points to a different existing library (no data transfer).</div>
+            <div class="settings-library__actions">
+              <button class="settings-cache__btn" id="library-change-apply">Apply</button>
+              <button class="settings-cache__btn" id="library-change-cancel">Cancel</button>
+            </div>
+            <div class="settings-library__progress is-hidden" id="library-transfer-progress">
+              <span class="settings-library__progress-text">Transferring data...</span>
+              <div class="settings-library__progress-bar">
+                <div class="settings-library__progress-fill" id="library-transfer-fill"></div>
+              </div>
+            </div>
+          </div>
+          <button class="settings-cache__btn" id="library-change-btn">Change</button>
+        </div>
+      </div>
+
       <!-- Appearance -->
       <div class="settings-section">
         <h3 class="settings-section__title">Appearance</h3>

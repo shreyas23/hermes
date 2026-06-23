@@ -2,6 +2,7 @@ import json
 import os
 import queue
 import re
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -20,12 +21,12 @@ from extractors import (
     map_images_to_sentences,
 )
 from models import (
-    LIBRARY_DIR,
     add_bookmark,
     add_feed,
     add_item,
     add_to_collection,
     add_watch_folder,
+    close_db,
     create_collection,
     delete_bookmark,
     delete_collection,
@@ -54,6 +55,7 @@ from models import (
     search_items,
     set_audio_requested,
     set_setting,
+    switch_library,
     update_bookmark_note,
     update_item_content,
     update_progress,
@@ -732,9 +734,9 @@ def voices_list():
 
 @app.route("/api/stats", methods=["GET"])
 def stats():
-    from models import AUDIO_DIR, get_db
+    import models as _m
 
-    with get_db() as db:
+    with _m.get_db() as db:
         items = db.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         audio_items = db.execute("SELECT COUNT(*) FROM items WHERE audio_ready = 1").fetchone()[0]
         dur_ms = db.execute("SELECT COALESCE(SUM(total_duration_ms), 0) FROM items WHERE audio_ready = 1").fetchone()[0]
@@ -742,8 +744,8 @@ def stats():
         feeds = db.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
         collections = db.execute("SELECT COUNT(*) FROM collections").fetchone()[0]
 
-    audio_bytes = _dir_size(AUDIO_DIR)
-    models_dir = os.path.join(LIBRARY_DIR, "models")
+    audio_bytes = _dir_size(_m.AUDIO_DIR)
+    models_dir = os.path.join(_m.LIBRARY_DIR, "models")
     models_bytes = _dir_size(models_dir)
     hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
     hf_bytes = _dir_size(hf_cache)
@@ -767,9 +769,11 @@ def stats():
 def cache_clear():
     import shutil
 
+    import models as _m
+
     data = request.get_json(silent=True) or {}
     target = data.get("target")
-    models_dir = os.path.join(LIBRARY_DIR, "models")
+    models_dir = os.path.join(_m.LIBRARY_DIR, "models")
     hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
 
     if target == "models":
@@ -797,6 +801,113 @@ def _dir_size(path):
             except OSError:
                 pass
     return total
+
+
+def _checkpoint_wal(lib_dir):
+    db_file = os.path.join(lib_dir, "library.db")
+    if not os.path.isfile(db_file):
+        return
+    try:
+        conn = sqlite3.connect(db_file)
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.close()
+    except sqlite3.Error:
+        pass
+
+
+# --- Library path ---
+
+
+@app.route("/api/library-path", methods=["GET"])
+def library_path_get():
+    import models
+
+    return jsonify({"path": models.LIBRARY_DIR})
+
+
+@app.route("/api/library-path", methods=["POST"])
+def library_path_change():
+    import shutil
+
+    import models
+
+    data = request.get_json(silent=True) or {}
+    new_path = data.get("path", "").strip()
+    mode = data.get("mode", "switch")
+
+    if mode not in ("copy", "move", "switch"):
+        return jsonify({"error": "Invalid mode"}), 400
+
+    if not new_path:
+        return jsonify({"error": "Path is required"}), 400
+
+    new_path = os.path.expanduser(new_path)
+    new_path = os.path.abspath(new_path)
+
+    old_path = models.LIBRARY_DIR
+
+    if os.path.normpath(new_path) == os.path.normpath(old_path):
+        return jsonify({"error": "Already using this library location"}), 400
+
+    if mode in ("copy", "move") and not os.path.isdir(old_path):
+        return jsonify({"error": "Current library not found"}), 400
+
+    parent = os.path.dirname(new_path)
+    if not os.path.isdir(parent):
+        return jsonify({"error": "Parent directory does not exist"}), 400
+
+    try:
+        os.makedirs(new_path, exist_ok=True)
+        test_file = os.path.join(new_path, ".hermes_write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.unlink(test_file)
+    except OSError:
+        return jsonify({"error": "Cannot write to destination"}), 400
+
+    if mode in ("copy", "move"):
+        close_db()
+        _checkpoint_wal(old_path)
+        entries = [e for e in os.listdir(old_path) if not e.endswith(("-wal", "-shm", "-journal"))]
+        total = len(entries)
+        broadcast_sse("library_transfer", {"status": "started", "mode": mode, "total": total, "done": 0})
+        try:
+            for i, name in enumerate(entries):
+                src = os.path.join(old_path, name)
+                dst = os.path.join(new_path, name)
+                if os.path.exists(dst):
+                    if os.path.isdir(dst):
+                        shutil.rmtree(dst)
+                    else:
+                        os.unlink(dst)
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+                broadcast_sse(
+                    "library_transfer",
+                    {
+                        "status": "progress",
+                        "mode": mode,
+                        "done": i + 1,
+                        "total": total,
+                        "name": name,
+                    },
+                )
+            if mode == "move":
+                shutil.rmtree(old_path)
+            broadcast_sse("library_transfer", {"status": "completed", "mode": mode})
+        except Exception as e:
+            broadcast_sse("library_transfer", {"status": "error", "message": str(e)})
+            if mode == "move":
+                switch_library(new_path)
+                broadcast_sse("library_changed", {"path": new_path})
+                return jsonify({"error": f"Transfer partially failed: {e}", "path": new_path}), 500
+            return jsonify({"error": f"Transfer failed: {e}"}), 500
+
+    switch_library(new_path)
+    broadcast_sse("library_changed", {"path": new_path})
+    return jsonify({"path": new_path, "mode": mode})
 
 
 # --- SSE ---

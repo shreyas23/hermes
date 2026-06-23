@@ -3,11 +3,15 @@ import threading
 import urllib.request
 import wave
 
+import models
 from engines import register
 from engines.base import TTSEngine, wav_duration_ms
-from models import LIBRARY_DIR
 
-KOKORO_DIR = os.path.join(LIBRARY_DIR, "models", "kokoro")
+
+def _kokoro_dir():
+    return os.path.join(models.LIBRARY_DIR, "models", "kokoro")
+
+
 _RELEASE_BASE = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
 _VOICES_FILE = "voices-v1.0.bin"
 
@@ -72,14 +76,14 @@ class KokoroEngine(TTSEngine):
             self._model = model
 
     def _ensure_files(self, model_file):
-        os.makedirs(KOKORO_DIR, exist_ok=True)
+        os.makedirs(_kokoro_dir(), exist_ok=True)
         for fname in (model_file, _VOICES_FILE):
-            path = os.path.join(KOKORO_DIR, fname)
+            path = os.path.join(_kokoro_dir(), fname)
             if not os.path.exists(path):
                 tmp = path + ".part"
                 urllib.request.urlretrieve(_RELEASE_BASE + fname, tmp)
                 os.replace(tmp, path)
-        return os.path.join(KOKORO_DIR, model_file), os.path.join(KOKORO_DIR, _VOICES_FILE)
+        return os.path.join(_kokoro_dir(), model_file), os.path.join(_kokoro_dir(), _VOICES_FILE)
 
     def _get_instance(self):
         model_file = _MODEL_FILES.get(self._model, _MODEL_FILES["kokoro-v1.0-int8"])
