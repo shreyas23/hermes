@@ -88,7 +88,8 @@ def broadcast_sse(event: str, data: dict):
 @app.route("/")
 def index():
     # default_design comes from the central config (models.DEFAULTS) unless overridden in settings
-    return render_template("index.html", default_design=get_setting("design"))
+    builtin_ids = [d["id"] for d in BUILTIN_DESIGNS]
+    return render_template("index.html", default_design=get_setting("design"), builtin_ids=builtin_ids)
 
 
 # --- Library endpoints ---

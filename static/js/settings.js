@@ -22,7 +22,6 @@ let cachedEdgeVoices = null;
 let cachedSayVoices = null;
 let cachedKokoroVoices = null;
 let cachedPiperVoices = null;
-let cachedThemes = null;
 
 function loadCustomThemeCss(designId) {
   const existing = document.getElementById('custom-theme-css');
@@ -40,17 +39,6 @@ function loadCustomThemeCss(designId) {
     link.id = 'custom-theme-css';
     document.head.appendChild(link);
   }
-}
-
-function populateThemes(themes, currentValue) {
-  designSelect.innerHTML = '';
-  for (const theme of themes) {
-    const opt = document.createElement('option');
-    opt.value = theme.id;
-    opt.textContent = theme.name + (theme.author ? ` — ${theme.author}` : '');
-    designSelect.appendChild(opt);
-  }
-  designSelect.value = currentValue;
 }
 
 function updateVoiceGroups(engine) {
@@ -81,7 +69,7 @@ export function initSettings() {
   themeBtn.addEventListener('click', toggleTheme);
   initLibraryPath();
   initRangeInputs();
-  loadAndApplySettings();
+  appSettings._ready = loadAndApplySettings();
 }
 
 function populateSelect(select, voices, labelFn) {
@@ -106,12 +94,18 @@ async function open() {
     cachedSayVoices ?? api('/api/voices?engine=say').then(r => (cachedSayVoices = r.voices)),
     cachedKokoroVoices ?? api('/api/voices?engine=kokoro').then(r => (cachedKokoroVoices = r.voices)),
     cachedPiperVoices ?? api('/api/voices?engine=piper').then(r => (cachedPiperVoices = r.voices)),
-    cachedThemes ?? api('/api/themes').then(r => (cachedThemes = r.themes)),
+    api('/api/themes').then(r => r.themes),
   ]);
 
   engineSelect.value = settings.tts_engine || 'edge';
   const currentDesign = settings.design || localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
-  if (themes) populateThemes(themes, currentDesign);
+  if (themes) {
+    populateSelect(designSelect, themes, t => t.name + (t.author ? ` — ${t.author}` : ''));
+    designSelect.value = currentDesign;
+    if (designSelect.selectedIndex === -1 && designSelect.options.length) {
+      designSelect.selectedIndex = 0;
+    }
+  }
 
   if (edgeVoices) populateSelect(edgeVoiceSelect, edgeVoices, v => `${v.name} (${v.gender})`);
   edgeVoiceSelect.value = settings.edge_voice || 'en-US-AriaNeural';
@@ -387,6 +381,7 @@ export const appSettings = {
   defaultSpeed: 1.0,
   autoScroll: true,
   saveInterval: 30000,
+  _ready: null,
 };
 
 function setRange(id, value, fmtFn) {

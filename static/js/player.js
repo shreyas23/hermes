@@ -185,9 +185,10 @@ export function initPlayer() {
   });
 }
 
-export function loadAudio(item) {
+export async function loadAudio(item) {
   if (canplayAbort) canplayAbort.abort();
   if (state.playingItemId !== item.id) {
+    if (appSettings._ready) await appSettings._ready;
     const idx = SPEED_OPTIONS.indexOf(appSettings.defaultSpeed);
     if (idx !== -1) state.speedIndex = idx;
   }

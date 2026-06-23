@@ -622,10 +622,13 @@ BUILTIN_DESIGNS = [
 
 
 def get_custom_themes():
+    builtin_ids = {d["id"] for d in BUILTIN_DESIGNS}
     themes = []
     if not os.path.isdir(THEMES_DIR):
         return themes
     for entry in sorted(os.listdir(THEMES_DIR)):
+        if entry in builtin_ids:
+            continue
         theme_dir = os.path.join(THEMES_DIR, entry)
         if not os.path.isdir(theme_dir):
             continue

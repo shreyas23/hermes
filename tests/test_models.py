@@ -331,3 +331,15 @@ def test_get_custom_themes_skips_nameless_manifest(isolated_db):
     (theme_dir / "theme.css").write_text("body {}")
 
     assert models.get_custom_themes() == []
+
+
+def test_get_custom_themes_skips_builtin_id_collision(isolated_db):
+    import json
+
+    for builtin_id in ("glass", "aurora", "ink"):
+        theme_dir = isolated_db / "themes" / builtin_id
+        theme_dir.mkdir(parents=True)
+        (theme_dir / "manifest.json").write_text(json.dumps({"name": f"Custom {builtin_id}"}))
+        (theme_dir / "theme.css").write_text("body {}")
+
+    assert models.get_custom_themes() == []

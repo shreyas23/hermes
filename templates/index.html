@@ -10,7 +10,7 @@
       || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', t);
     window.__DEFAULT_DESIGN = '{{ default_design }}';
-    window.__BUILTIN_DESIGNS = ['glass', 'aurora', 'ink'];
+    window.__BUILTIN_DESIGNS = {{ builtin_ids | tojson }};
     const d = localStorage.getItem('hermes-design') || window.__DEFAULT_DESIGN;
     document.documentElement.setAttribute('data-design', d);
     if (!window.__BUILTIN_DESIGNS.includes(d)) {

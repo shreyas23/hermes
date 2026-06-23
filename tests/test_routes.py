@@ -240,3 +240,26 @@ def test_theme_css_missing_is_404(client):
 def test_theme_css_path_traversal_blocked(client):
     resp = client.get("/api/themes/..%2F..%2Fetc%2Fpasswd/theme.css")
     assert resp.status_code in (403, 404)
+
+
+def test_themes_list_excludes_builtin_collisions(client, isolated_db):
+    import json
+
+    theme_dir = isolated_db / "themes" / "ink"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "manifest.json").write_text(json.dumps({"name": "Custom Ink"}))
+    (theme_dir / "theme.css").write_text("body {}")
+
+    resp = client.get("/api/themes")
+    themes = resp.get_json()["themes"]
+    ink_entries = [t for t in themes if t["id"] == "ink"]
+    assert len(ink_entries) == 1
+    assert ink_entries[0]["builtin"] is True
+
+
+def test_index_renders_builtin_designs_list(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"__BUILTIN_DESIGNS" in resp.data
+    assert b'"glass"' in resp.data
+    assert b'"ink"' in resp.data
