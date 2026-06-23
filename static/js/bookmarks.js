@@ -35,7 +35,7 @@ function togglePanel() {
   btn.classList.toggle('is-active', !open);
 }
 
-async function addCurrent() {
+export async function addCurrent() {
   const item = state.currentItem;
   if (!item) return;
   const idx = getActiveSentenceIndex();

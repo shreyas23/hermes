@@ -47,6 +47,13 @@ function setPlaybackState(playbackState) {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playbackState;
 }
 
+function cycleSpeed(dir) {
+  state.speedIndex = (state.speedIndex + dir + SPEED_OPTIONS.length) % SPEED_OPTIONS.length;
+  const speed = SPEED_OPTIONS[state.speedIndex];
+  state.audio.playbackRate = speed;
+  btnSpeed.textContent = speed === 1 ? '1x' : `${speed}x`;
+}
+
 export function initPlayer() {
   btnPlay.addEventListener('click', play);
   btnPause.addEventListener('click', pause);
@@ -78,12 +85,7 @@ export function initPlayer() {
     highlightCurrentSentence();
   });
 
-  btnSpeed.addEventListener('click', () => {
-    state.speedIndex = (state.speedIndex + 1) % SPEED_OPTIONS.length;
-    const speed = SPEED_OPTIONS[state.speedIndex];
-    state.audio.playbackRate = speed;
-    btnSpeed.textContent = speed === 1 ? '1x' : `${speed}x`;
-  });
+  btnSpeed.addEventListener('click', () => cycleSpeed(1));
 
   state.audio.addEventListener('ended', async () => {
     state.playing = false;
@@ -137,14 +139,32 @@ export function initPlayer() {
   // Keyboard
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
     switch (e.code) {
       case 'Space':
         if (!state.currentItem?.audio_ready) return;
         e.preventDefault();
         state.playing ? pause() : play();
         break;
-      case 'ArrowLeft': e.preventDefault(); btnPrev.click(); break;
-      case 'ArrowRight': e.preventDefault(); btnNext.click(); break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (e.shiftKey) { btnBack15.click(); }
+        else { btnPrev.click(); }
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (e.shiftKey) { btnFwd15.click(); }
+        else { btnNext.click(); }
+        break;
+      case 'BracketLeft':
+        e.preventDefault();
+        cycleSpeed(-1);
+        break;
+      case 'BracketRight':
+        e.preventDefault();
+        cycleSpeed(1);
+        break;
     }
   });
 
