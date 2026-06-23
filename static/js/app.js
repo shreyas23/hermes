@@ -8,10 +8,14 @@ import { initDiscover } from './discover.js';
 import { initSettings } from './settings.js';
 import { initConfirm } from './confirm-modal.js';
 import { initSearch, resetSearch } from './search.js';
-import { initBookmarks, loadBookmarks, resetBookmarks } from './bookmarks.js';
-import { initQueue, removeItemById } from './queue.js';
+import { initBookmarks, loadBookmarks, resetBookmarks, addCurrent as addBookmark } from './bookmarks.js';
+import { initQueue, removeItemById, advanceQueue } from './queue.js';
 import { initSleepTimer } from './sleep-timer.js';
 import { initDragDrop } from './drag-drop.js';
+import { initDashboard, loadDashboard as _loadDashboard } from './dashboard.js';
+const DASHBOARD_ENABLED = false;
+const loadDashboard = DASHBOARD_ENABLED ? _loadDashboard : () => {};
+import { toastSuccess, toastError } from './toast.js';
 
 const emptyState = document.getElementById('empty-state');
 const playerState = document.getElementById('player-state');
@@ -32,6 +36,7 @@ initSidebar({
       state.currentItemId = null;
       state.currentItem = null;
       showView('empty');
+      loadDashboard();
     }
   },
 });
@@ -61,6 +66,7 @@ const onImport = (itemId, autoOpen = true) => {
 initModal({ onImport });
 initDiscover({ onImport });
 initDragDrop({ onImport });
+if (DASHBOARD_ENABLED) initDashboard({ onOpen: openItem });
 
 // Generic close affordance: any modal X button closes its backdrop.
 document.querySelectorAll('.modal__close').forEach(btn => {
@@ -121,6 +127,59 @@ document.getElementById('audio-gen-cancel').addEventListener('click', async () =
   await api(`/api/library/${id}/cancel`, { method: 'POST' });
 });
 
+// --- App-level keyboard shortcuts ---
+async function importFromClipboard(forceText = false) {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text?.trim()) { toastError('Clipboard is empty'); return; }
+    const trimmed = text.trim();
+    if (!forceText && /^https?:\/\//i.test(trimmed)) {
+      toastSuccess('Importing URL...');
+      const data = await api('/api/import/url', { body: { url: trimmed } });
+      if (data.error) return;
+      onImport(data.item_id);
+    } else {
+      toastSuccess('Importing text...');
+      const title = trimmed.split('\n')[0].slice(0, 80) || 'Clipboard';
+      const data = await api('/api/import/text', { body: { title, text: trimmed } });
+      if (data.error) return;
+      onImport(data.item_id);
+    }
+  } catch {
+    toastError('Cannot read clipboard');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const meta = e.metaKey || e.ctrlKey;
+
+  if (meta && e.key === 'v') {
+    e.preventDefault();
+    importFromClipboard(e.shiftKey);
+    return;
+  }
+
+  if (meta || e.altKey) return;
+
+  switch (e.code) {
+    case 'KeyB':
+      e.preventDefault();
+      addBookmark();
+      break;
+    case 'KeyN':
+      e.preventDefault();
+      advanceQueue();
+      break;
+    case 'Escape':
+      if (playerState.classList.contains('is-visible') && !document.querySelector('.modal-backdrop.is-visible')) {
+        showView('empty');
+        loadDashboard();
+      }
+      break;
+  }
+});
+
 connectSSE({
   generation_progress: (data) => {
     const total = data.total || 1;
@@ -135,6 +194,7 @@ connectSSE({
       openItem(state.currentItemId);
     }
     loadView(state.currentView);
+    loadDashboard();
   },
   generation_cancelled: (data) => {
     if (data.item_id === state.currentItemId) {
@@ -144,11 +204,13 @@ connectSSE({
   },
   watch_folder_import: () => {
     loadView(state.currentView);
+    loadDashboard();
   },
 });
 
 loadView('recent');
 loadCollections();
+loadDashboard();
 
 // --- Core ---
 async function openItem(itemId) {

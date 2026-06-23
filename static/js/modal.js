@@ -29,9 +29,6 @@ export function initModal({ onImport }) {
   document.getElementById('import-text-btn').addEventListener('click', importText);
 
   document.getElementById('watch-folder-add-btn').addEventListener('click', addWatchFolder);
-  document.getElementById('watch-folder-path').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addWatchFolder();
-  });
 
   document.addEventListener('keydown', e => {
     if (e.code === 'Escape') {
@@ -150,7 +147,7 @@ async function loadWatchFolders() {
 }
 
 async function addWatchFolder() {
-  const input = document.getElementById('watch-folder-path');
+  const input = document.getElementById('import-folder-path');
   const path = input.value.trim();
   if (!path) return;
   const data = await api('/api/watch-folders', { body: { path }, showError: false });
@@ -158,6 +155,5 @@ async function addWatchFolder() {
     toastError(data.error);
     return;
   }
-  input.value = '';
   loadWatchFolders();
 }
