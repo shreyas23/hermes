@@ -10,5 +10,6 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run pytest
+      - run: npm ci
       - run: npx playwright install chromium
       - run: npm run e2e:all
