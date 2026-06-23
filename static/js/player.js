@@ -187,7 +187,7 @@ export function initPlayer() {
 
 export function loadAudio(item) {
   if (canplayAbort) canplayAbort.abort();
-  if (!state.playingItemId) {
+  if (state.playingItemId !== item.id) {
     const idx = SPEED_OPTIONS.indexOf(appSettings.defaultSpeed);
     if (idx !== -1) state.speedIndex = idx;
   }

@@ -9,7 +9,7 @@ const readerView = document.getElementById('reader-view');
 const teleprompterBtn = document.getElementById('btn-teleprompter');
 const appEl = document.getElementById('app');
 
-let autoFollow = appSettings.autoScroll;
+let autoFollow = true;
 let programmaticScroll = false;
 let userScrollTimeout = null;
 let lastHighlightedIndex = -1;
@@ -28,7 +28,7 @@ export function initReaderHighlight(onSentenceClick) {
   }, { passive: true });
 
   followBtn.addEventListener('click', () => {
-    autoFollow = appSettings.autoScroll;
+    autoFollow = true;
     followBtn.classList.remove('is-visible');
     scrollToActive();
   });
@@ -52,7 +52,7 @@ export function toggleTeleprompter() {
   teleprompterActive = !teleprompterActive;
   appEl.classList.toggle('app--teleprompter', teleprompterActive);
   teleprompterBtn.classList.toggle('is-active', teleprompterActive);
-  autoFollow = appSettings.autoScroll;
+  autoFollow = true;
   followBtn.classList.remove('is-visible');
   lastHighlightedIndex = -1;
   highlightCurrentSentence();
@@ -214,7 +214,7 @@ function scrollToActive() {
   const offset = teleprompterActive ? containerRect.height / 2 - elRect.height / 2 : containerRect.height / 3;
   const target = container.scrollTop + elRect.top - containerRect.top - offset;
 
-  autoFollow = appSettings.autoScroll;
+  autoFollow = true;
 
   if (teleprompterActive) {
     animateScroll(target);
@@ -237,7 +237,7 @@ function updateFollowButton() {
   const isVisible = elRect.top >= containerRect.top && elRect.bottom <= containerRect.bottom;
 
   if (isVisible) {
-    autoFollow = appSettings.autoScroll;
+    autoFollow = true;
     followBtn.classList.remove('is-visible');
   } else {
     followBtn.classList.add('is-visible');

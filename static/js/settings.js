@@ -196,6 +196,10 @@ async function save() {
     }
   });
   applyReaderSettings();
+  appSettings.skipInterval = parseInt(document.getElementById('setting-skip-interval').value) || 15;
+  appSettings.defaultSpeed = parseFloat(document.getElementById('setting-default-speed').value) || 1.0;
+  appSettings.autoScroll = document.getElementById('setting-auto-scroll').value !== 'off';
+  appSettings.saveInterval = parseInt(document.getElementById('setting-save-interval').value) || 30000;
   toastSuccess('Settings saved');
   close();
 }

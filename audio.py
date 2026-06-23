@@ -159,7 +159,8 @@ def _cleanup_partial(audio_dir, count):
 def _convert_to_m4a(wav_path, m4a_path):
     from models import get_setting
 
-    bitrate = get_setting("audio_bitrate") or "64000"
+    raw = get_setting("audio_bitrate") or "64000"
+    bitrate = raw if raw.isdigit() else "64000"
     subprocess.run(
         ["afconvert", "-f", "m4af", "-d", "aac", "-b", bitrate, wav_path, m4a_path],
         check=True,
@@ -171,7 +172,10 @@ def _convert_to_m4a(wav_path, m4a_path):
 def _concatenate_wavs(audio_dir, count, output_path):
     from models import get_setting
 
-    pause_ms = int(get_setting("sentence_pause_ms") or 100)
+    try:
+        pause_ms = int(get_setting("sentence_pause_ms") or 100)
+    except (TypeError, ValueError):
+        pause_ms = 100
     params_set = False
     framerate = 22050
     with wave.open(output_path, "wb") as out:

@@ -65,6 +65,10 @@ All user data lives under `~/hermes-library/`:
   audio/
     <item_id>/
       master.wav            # Concatenated audio (22050Hz mono 16-bit PCM)
+  themes/
+    <theme-name>/
+      manifest.json         # { "name", "version", "author" }
+      theme.css             # CSS variable overrides
 ```
 
 - **library.db** — contains item metadata (title, source_type, source_url, original_path), extracted text content, sentence arrays (JSON), timeline mappings (JSON), playback progress, collection membership, reader_html (structured HTML for PDFs/articles), toc (JSON table of contents for PDFs), feed subscriptions, and bookmarks/annotations (per-item, by sentence index).
@@ -116,18 +120,45 @@ The UI supports multiple visual designs, switchable via Settings > Design. The s
 
 **How it works:** Each design is a `[data-design="..."]` CSS selector block in `designs.css` that overrides tokens from `tokens.css`. Glass tokens are the base layer in `tokens.css` (so other designs only override what differs); `ink` is the default *selected* design. Light/dark variants use `[data-design="..."][data-theme="dark"]` selectors. The `data-design` attribute is set on `<html>`, initialized from localStorage (falling back to the templated default) in the `<head>` script, and persisted to both localStorage and SQLite on change.
 
-**Adding a new design:**
+**Adding a built-in design:**
 1. Add a token override block to `static/css/designs.css` (light + dark variants)
-2. Add an `<option>` to the `#setting-design` select in `templates/index.html`
+2. Add an entry to `BUILTIN_DESIGNS` in `models.py`
 3. Key tokens to override: `--accent`, `--glass-bg`, `--glass-blur` (set to `blur(0px)` for opaque), `--glass-border`, `--glass-shadow`, `--accent-glow` (set to `none` to disable), `--radius-md`/`--radius-lg`, `--shadow-*`, plus body background and reading highlight via element selectors
+
+**Custom themes (user-importable, Obsidian-style):**
+
+Users can add themes by placing a folder in `~/hermes-library/themes/`:
+
+```
+~/hermes-library/themes/
+  my-theme/
+    manifest.json    # { "name": "My Theme", "version": "1.0", "author": "..." }
+    theme.css        # [data-design="my-theme"] { --accent: ...; ... }
+```
+
+- `manifest.json` must have at least a `name` field. `version` and `author` are optional.
+- `theme.css` uses the same `[data-design="<folder-name>"]` selector convention as built-in designs. Must provide both light and dark variants.
+- Themes appear in Settings > Design alongside built-ins. CSS is loaded dynamically via `/api/themes/<name>/theme.css`.
+- The `<head>` script injects a blocking `<link>` for custom themes before first paint (no flash).
+- API: `GET /api/themes` returns all themes (built-in + custom). `GET /api/themes/<name>/theme.css` serves custom theme CSS.
 
 ## Settings
 
 Stored in SQLite `settings` table. Key settings:
-- `design` — `ink` (default), `glass`, or `aurora`
+- `design` — `ink` (default), `glass`, or `aurora` (plus custom themes)
 - `tts_engine` — `edge` (default) or `say`
 - `edge_voice` / `say_voice` — voice selection per engine
 - `pdf_tables` — `off` (default) disables HTML table rendering in PDFs; set to `on` to enable (tables are often broken by pymupdf4llm's cell-splitting)
+- `skip_interval` — skip forward/back seconds (`15` default, range 5–60)
+- `default_speed` — initial playback speed (`1` default, one of 0.5/0.75/1/1.25/1.5/2)
+- `auto_scroll` — whether reader auto-follows playback (`on` default)
+- `reader_font_size` — reader text size in px (`15` default, range 12–24)
+- `reader_line_height` — reader line spacing (`1.8` default, range 1.2–2.4)
+- `reader_max_width` — reader content width in px (`720` default, range 500–1200)
+- `audio_bitrate` — AAC export bitrate (`64000` default, options: 32000/64000/96000/128000)
+- `sentence_pause_ms` — silence between sentences in ms (`100` default, range 0–500)
+- `watch_interval` — watch folder scan interval in seconds (`30` default, range 10–300)
+- `save_interval` — progress auto-save interval in ms (`30000` default, range 5000–120000)
 
 ## Future development
 
