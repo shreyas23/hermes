@@ -128,6 +128,12 @@ def inject_sentence_spans(html, sentences):
                 prev.insert_after(part)
                 prev = part
 
+    # Strip data-si from parent elements whose children already have data-si.
+    # This prevents nested data-si spans that cause cascading style conflicts.
+    for el in list(soup.select("[data-si]")):
+        if el.select("[data-si]"):
+            del el["data-si"]
+
     return str(soup)
 
 

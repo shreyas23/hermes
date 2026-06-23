@@ -133,7 +133,7 @@ Stored in SQLite `settings` table. Key settings:
 
 Ordered by dependency and impact — each tier makes the product meaningfully better for current users before expanding scope.
 
-**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item), drag-and-drop import (multipart upload), watch folders (background scanner every 30s, managed in Settings).
+**Shipped:** Discover (Wikipedia search + RSS/Atom & Substack feed subscriptions), opt-in audio generation with cancel/retry, global media keys (Media Session API), search within transcript, bookmarks & annotations, play queue (session-only, auto-advance, "Play Next" / "Add to Queue" via right-click), sleep timer (timed or end-of-item), drag-and-drop import (multipart upload), watch folders (background scanner every 30s, managed in Settings), teleprompter mode (immersive centered-sentence view, toggle via T key or toolbar button).
 
 **1. Capture & export** — close the loop on the comprehension tools we just shipped
 - **Export highlights** — export stored bookmarks & annotations (Markdown/file); builds directly on the `bookmarks` table
@@ -143,6 +143,7 @@ Ordered by dependency and impact — each tier makes the product meaningfully be
 - **OpenAI TTS** — optional cloud fallback for users who want the highest fidelity and don't mind API calls
 
 **3. Content expansion** — feeds are subscribable today; this makes them proactive
+- **Browser extension** — Safari/Chrome extension with a "Send to Hermes" button. Sends the current page URL to the local Flask API (`/api/import/url`) for extraction and import. One-click capture without switching windows.
 - **Background feed sync** — periodically pull new entries from subscribed feeds into the library (currently entries are fetched on-demand in Discover)
 - **Daily briefing** — auto-queue unread items by priority each morning (depends on play queue)
 

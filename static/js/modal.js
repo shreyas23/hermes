@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { confirmAction } from './confirm-modal.js';
 import { toastSuccess, toastError } from './toast.js';
 import { escHtml } from './utils.js';
 
@@ -52,7 +53,7 @@ async function importWithDuplicateCheck(path, body) {
   let data = await api(path, { body, showError: false });
   if (data.error === 'duplicate') {
     const title = data.existing?.title || 'an existing item';
-    if (!confirm(`This item already exists as "${title}". Import anyway?`)) return null;
+    if (!await confirmAction({ title: 'Duplicate item', message: `This item already exists as "${title}". Import anyway?`, confirmLabel: 'Import anyway', destructive: false })) return null;
     data = await api(path, { body: { ...body, force: true } });
   } else if (data.error) {
     toastError(data.error);

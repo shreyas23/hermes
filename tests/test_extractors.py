@@ -102,6 +102,16 @@ def test_inject_sentence_crossing_inline_element():
     assert si0.find("b") is not None
 
 
+def test_inject_no_nested_data_si():
+    html = '<p>Fun is underrated. The best work comes from <a href="x">joy</a> and excitement. Next.</p>'
+    sentences = ["Fun is underrated.", "The best work comes from joy and excitement.", "Next."]
+    out = inject_sentence_spans(html, sentences)
+    soup = BeautifulSoup(out, "html.parser")
+    for el in soup.select("[data-si]"):
+        parent = el.find_parent(attrs={"data-si": True})
+        assert parent is None, f"data-si={el['data-si']} nested inside data-si={parent['data-si']}"
+
+
 def test_inject_unmatched_sentences_skipped_gracefully():
     html = "<p>Only this sentence exists.</p>"
     sentences = ["Only this sentence exists.", "This sentence is not in the html at all."]

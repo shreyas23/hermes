@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { state } from './state.js';
 import { showContextMenu } from './contextmenu.js';
-import { confirmAction } from './confirm-modal.js';
+import { confirmAction, promptAction } from './confirm-modal.js';
 import { toastSuccess } from './toast.js';
 import { formatTime, escHtml } from './utils.js';
 import { addToQueue, playNext } from './queue.js';
@@ -40,7 +40,7 @@ export function initSidebar({ onOpen, onDelete }) {
   });
 
   document.getElementById('btn-new-collection').addEventListener('click', async () => {
-    const name = prompt('Collection name:');
+    const name = await promptAction({ title: 'New collection', placeholder: 'Collection name', confirmLabel: 'Create' });
     if (!name) return;
     await api('/api/collections', { body: { name } });
     loadCollections();
@@ -130,15 +130,43 @@ function renderItemList(items) {
       const actions = [
         { label: 'Open', onClick: () => onItemOpen?.(item.id) },
       ];
+      if (item.source_url) {
+        actions.push({
+          label: 'Copy link',
+          onClick: () => {
+            navigator.clipboard.writeText(item.source_url);
+            toastSuccess('Link copied');
+          },
+        });
+      }
       if (item.audio_ready) {
         actions.push(
           { label: 'Play Next', onClick: () => playNext(item) },
           { label: 'Add to Queue', onClick: () => addToQueue(item) },
         );
+        actions.push({
+          label: 'Regenerate audio',
+          onClick: async () => {
+            const data = await api(`/api/library/${item.id}/regenerate`, { method: 'POST' });
+            if (data.error) return;
+            loadView(state.currentView);
+            if (state.currentItemId === item.id) onItemOpen?.(item.id);
+          },
+        });
+        actions.push({
+          label: 'Clear recording',
+          onClick: async () => {
+            const data = await api(`/api/library/${item.id}/clear-audio`, { method: 'POST' });
+            if (data.error) return;
+            toastSuccess('Recording cleared');
+            loadView(state.currentView);
+            if (state.currentItemId === item.id) onItemOpen?.(item.id);
+          },
+        });
       }
       if (!item.audio_ready && !item.generating) {
         actions.push({
-          label: item.interrupted ? 'Regenerate audio' : 'Generate audio',
+          label: item.interrupted ? 'Retry audio' : 'Generate audio',
           onClick: async () => {
             const data = await api(`/api/library/${item.id}/generate`, { method: 'POST' });
             if (data.error) return;
@@ -149,15 +177,16 @@ function renderItemList(items) {
       actions.push({ separator: true });
       const data = await api('/api/collections', { showError: false });
       if (data.collections?.length) {
-        data.collections.forEach(c => {
-          actions.push({
-            label: `Add to ${c.name}`,
+        actions.push({
+          label: 'Add to collection',
+          submenu: data.collections.map(c => ({
+            label: c.name,
             onClick: async () => {
               await api(`/api/collections/${c.id}/items`, { body: { item_id: item.id } });
               toastSuccess(`Added to ${c.name}`);
               loadCollections();
             },
-          });
+          })),
         });
         actions.push({ separator: true });
       }

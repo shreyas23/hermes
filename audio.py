@@ -78,7 +78,7 @@ def generate_audio_for_item(item_id, sentences, cancel_event, on_progress=None, 
             os.unlink(sent_wav)
 
     timeline = [{"index": t.index, "start_ms": t.start_ms, "duration_ms": t.duration_ms} for t in timestamps]
-    update_item_audio(item_id, timeline, cumulative_ms)
+    update_item_audio(item_id, timeline, cumulative_ms, tts_engine=engine)
 
     return timeline, cumulative_ms
 

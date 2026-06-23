@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { confirmAction } from './confirm-modal.js';
 import { escHtml } from './utils.js';
 import { toastError, toastSuccess } from './toast.js';
 
@@ -74,7 +75,7 @@ async function addToLibrary(url, btn) {
   let data = await api('/api/import/url', { body: { url }, showError: false });
   if (data.error === 'duplicate') {
     const title = data.existing?.title || 'an existing item';
-    if (!confirm(`Already in your library as "${title}". Add again?`)) {
+    if (!await confirmAction({ title: 'Duplicate item', message: `Already in your library as "${title}". Add again?`, confirmLabel: 'Add anyway', destructive: false })) {
       btn.disabled = false; btn.textContent = 'Add';
       return;
     }

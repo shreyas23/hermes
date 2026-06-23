@@ -73,7 +73,14 @@ def init_db():
                 created_at REAL NOT NULL
             );
         """)
-        for col in ["images TEXT", "reader_html TEXT", "toc TEXT", "audio_requested INTEGER DEFAULT 0"]:
+        migrate_cols = [
+            "images TEXT",
+            "reader_html TEXT",
+            "toc TEXT",
+            "audio_requested INTEGER DEFAULT 0",
+            "tts_engine TEXT",
+        ]
+        for col in migrate_cols:
             try:
                 db.execute(f"ALTER TABLE items ADD COLUMN {col}")
             except sqlite3.OperationalError:
@@ -172,12 +179,41 @@ def find_duplicate(source_url=None, original_path=None):
     return None
 
 
-def update_item_audio(item_id, timeline, total_duration_ms):
+def update_item_audio(item_id, timeline, total_duration_ms, tts_engine=None):
     with get_db() as db:
         db.execute(
             """UPDATE items SET timeline = ?, total_duration_ms = ?,
-               audio_ready = 1, updated_at = ? WHERE id = ?""",
-            (json.dumps(timeline), total_duration_ms, time.time(), item_id),
+               audio_ready = 1, tts_engine = COALESCE(?, tts_engine),
+               updated_at = ? WHERE id = ?""",
+            (json.dumps(timeline), total_duration_ms, tts_engine, time.time(), item_id),
+        )
+
+
+def reset_item_audio(item_id):
+    with get_db() as db:
+        db.execute(
+            """UPDATE items SET audio_ready = 0, audio_requested = 0,
+               timeline = NULL, total_duration_ms = NULL, updated_at = ?
+               WHERE id = ?""",
+            (time.time(), item_id),
+        )
+
+
+def update_item_content(item_id, text_content, sentences, reader_html=None, toc=None, images=None):
+    with get_db() as db:
+        db.execute(
+            """UPDATE items SET text_content = ?, sentences = ?,
+               reader_html = ?, toc = ?, images = ?, updated_at = ?
+               WHERE id = ?""",
+            (
+                text_content,
+                json.dumps(sentences),
+                reader_html,
+                json.dumps(toc) if toc else None,
+                json.dumps(images) if images else None,
+                time.time(),
+                item_id,
+            ),
         )
 
 
@@ -228,7 +264,7 @@ _ITEMS_WITH_PROGRESS = """
 
 _ITEMS_SUMMARY = """
     SELECT i.id, i.title, i.source_type, i.source_url, i.sentences,
-           i.total_duration_ms, i.audio_ready, i.audio_requested, i.created_at,
+           i.total_duration_ms, i.audio_ready, i.audio_requested, i.tts_engine, i.created_at,
            p.current_sentence AS p_current_sentence,
            p.current_time_ms AS p_current_time_ms,
            p.is_finished AS p_is_finished,

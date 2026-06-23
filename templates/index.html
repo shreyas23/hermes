@@ -101,6 +101,14 @@
             <button class="reader__search-nav" id="reader-search-close" title="Close">&times;</button>
           </div>
 
+          <button class="reader__teleprompter-btn" id="btn-teleprompter" title="Teleprompter mode (T)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <line x1="3" y1="4" x2="13" y2="4"/>
+              <line x1="5" y1="8" x2="11" y2="8"/>
+              <line x1="3" y1="12" x2="13" y2="12"/>
+            </svg>
+          </button>
+
           <button class="reader__bookmarks-btn" id="btn-bookmarks" title="Bookmarks &amp; notes">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
               <path d="M4 2.5h8v11l-4-3-4 3z"/>
@@ -358,6 +366,7 @@
     <div class="modal modal--narrow" role="dialog" aria-label="Confirm">
       <h2 class="modal__title" id="confirm-title">Are you sure?</h2>
       <p class="confirm__message" id="confirm-message"></p>
+      <input type="text" class="modal__input is-hidden" id="confirm-input" placeholder="">
       <button class="modal__submit modal__submit--destructive" id="confirm-ok">Delete</button>
       <button class="modal__cancel" id="confirm-cancel">Cancel</button>
     </div>

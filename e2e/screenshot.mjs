@@ -51,6 +51,18 @@ try {
       await page.screenshot({ path: `${DIR}/03-playing.png` });
       console.log('03-playing.png — playing');
 
+      // Teleprompter mode
+      await readyItems.first().click();
+      await sleep(300);
+      await page.click('#btn-teleprompter');
+      await sleep(500);
+      await page.screenshot({ path: `${DIR}/05-teleprompter.png` });
+      console.log('05-teleprompter.png — teleprompter mode while playing');
+
+      // Exit teleprompter
+      await page.click('#btn-teleprompter');
+      await sleep(300);
+
       if (await readyItems.count() > 1) {
         await readyItems.nth(1).click();
         await sleep(500);

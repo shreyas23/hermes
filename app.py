@@ -44,15 +44,18 @@ from models import (
     get_setting,
     get_watch_folders,
     init_db,
+    item_audio_dir,
     item_images_dir,
     item_master_m4a,
     item_master_wav,
     remove_from_collection,
     remove_watch_folder,
+    reset_item_audio,
     search_items,
     set_audio_requested,
     set_setting,
     update_bookmark_note,
+    update_item_content,
     update_progress,
     update_watch_folder_scanned,
 )
@@ -147,7 +150,7 @@ def library_cancel(item_id):
 
 @app.route("/api/library/<int:item_id>/progress", methods=["POST"])
 def library_progress(item_id):
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     update_progress(
         item_id,
         data.get("current_sentence", 0),
@@ -166,10 +169,59 @@ def library_generate(item_id):
         return jsonify({"error": "Audio already generated"}), 400
     if is_generating(item_id):
         return jsonify({"error": "Already generating"}), 400
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     engine_override = data.get("engine")
     _start_generation(item_id, item["sentences"], engine_override=engine_override)
     return jsonify({"generating": True, "item_id": item_id})
+
+
+@app.route("/api/library/<int:item_id>/regenerate", methods=["POST"])
+def library_regenerate(item_id):
+    item = get_item(item_id)
+    if not item:
+        return jsonify({"error": "Not found"}), 404
+    if is_generating(item_id):
+        return jsonify({"error": "Already generating"}), 400
+    import shutil
+
+    audio_dir = item_audio_dir(item_id)
+    if os.path.isdir(audio_dir):
+        shutil.rmtree(audio_dir)
+    reset_item_audio(item_id)
+
+    sentences = item["sentences"]
+    re_extracted = _re_extract(item)
+    if re_extracted:
+        sentences = re_extracted["sentences"]
+        update_item_content(
+            item_id,
+            text_content=re_extracted["text"],
+            sentences=sentences,
+            reader_html=re_extracted.get("reader_html"),
+            toc=re_extracted.get("toc"),
+            images=re_extracted.get("images"),
+        )
+
+    data = request.get_json(silent=True) or {}
+    engine_override = data.get("engine") or item.get("tts_engine")
+    _start_generation(item_id, sentences, engine_override=engine_override)
+    return jsonify({"generating": True, "item_id": item_id, "re_extracted": bool(re_extracted)})
+
+
+@app.route("/api/library/<int:item_id>/clear-audio", methods=["POST"])
+def library_clear_audio(item_id):
+    item = get_item(item_id)
+    if not item:
+        return jsonify({"error": "Not found"}), 404
+    if is_generating(item_id):
+        cancel_generation(item_id)
+    import shutil
+
+    audio_dir = item_audio_dir(item_id)
+    if os.path.isdir(audio_dir):
+        shutil.rmtree(audio_dir)
+    reset_item_audio(item_id)
+    return jsonify({"cleared": True, "item_id": item_id})
 
 
 @app.route("/api/library/<int:item_id>/images/<path:filename>")
@@ -255,7 +307,7 @@ def _do_import_file(file_path, original_path=None, title=None):
 
 @app.route("/api/import/file", methods=["POST"])
 def import_file():
-    body = request.json or {}
+    body = request.get_json(silent=True) or {}
     file_path = body.get("path", "")
     if not os.path.isfile(file_path):
         return jsonify({"error": "File not found"}), 404
@@ -302,7 +354,7 @@ def import_upload():
 
 @app.route("/api/import/url", methods=["POST"])
 def import_url():
-    body = request.json or {}
+    body = request.get_json(silent=True) or {}
     url = body.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
@@ -427,7 +479,7 @@ def import_url():
 
 @app.route("/api/import/text", methods=["POST"])
 def import_text():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     title = data.get("title", "Untitled").strip()
     text = data.get("text", "").strip()
     if not text:
@@ -449,7 +501,7 @@ def import_text():
 
 @app.route("/api/import/folder", methods=["POST"])
 def import_folder():
-    folder = (request.json or {}).get("folder", "")
+    folder = (request.get_json(silent=True) or {}).get("folder", "")
     folder = os.path.expanduser(folder)
     if not os.path.isdir(folder):
         return jsonify({"error": "Not a valid directory"}), 400
@@ -486,7 +538,7 @@ def list_feeds():
 
 @app.route("/api/feeds", methods=["POST"])
 def subscribe_feed():
-    url = (request.json or {}).get("url", "").strip()
+    url = (request.get_json(silent=True) or {}).get("url", "").strip()
     if not url:
         return jsonify({"error": "No feed URL provided"}), 400
     if not url.startswith(("http://", "https://")):
@@ -528,7 +580,7 @@ def list_bookmarks(item_id):
 
 @app.route("/api/library/<int:item_id>/bookmarks", methods=["POST"])
 def create_bookmark(item_id):
-    body = request.json or {}
+    body = request.get_json(silent=True) or {}
     sentence_index = body.get("sentence_index")
     if sentence_index is None:
         return jsonify({"error": "No sentence_index provided"}), 400
@@ -538,7 +590,7 @@ def create_bookmark(item_id):
 
 @app.route("/api/bookmarks/<int:bookmark_id>", methods=["PATCH"])
 def patch_bookmark(bookmark_id):
-    body = request.json or {}
+    body = request.get_json(silent=True) or {}
     update_bookmark_note(bookmark_id, body.get("note", ""))
     return jsonify({"ok": True})
 
@@ -559,7 +611,7 @@ def list_collections():
 
 @app.route("/api/collections", methods=["POST"])
 def new_collection():
-    name = (request.json or {}).get("name", "").strip()
+    name = (request.get_json(silent=True) or {}).get("name", "").strip()
     if not name:
         return jsonify({"error": "Name required"}), 400
     cid = create_collection(name)
@@ -574,7 +626,7 @@ def del_collection(cid):
 
 @app.route("/api/collections/<int:cid>/items", methods=["POST"])
 def collection_add(cid):
-    item_id = (request.json or {}).get("item_id")
+    item_id = (request.get_json(silent=True) or {}).get("item_id")
     add_to_collection(cid, item_id)
     return jsonify({"added": True})
 
@@ -608,7 +660,7 @@ _ALLOWED_SETTINGS = {
 
 @app.route("/api/settings", methods=["POST"])
 def settings_update():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     for key, value in data.items():
         if key in _ALLOWED_SETTINGS:
             set_setting(key, value)
@@ -625,7 +677,7 @@ def list_watch_folders():
 
 @app.route("/api/watch-folders", methods=["POST"])
 def add_watch_folder_route():
-    path = (request.json or {}).get("path", "").strip()
+    path = (request.get_json(silent=True) or {}).get("path", "").strip()
     path = os.path.expanduser(path)
     if not os.path.isdir(path):
         return jsonify({"error": "Directory not found"}), 404
@@ -715,7 +767,7 @@ def stats():
 def cache_clear():
     import shutil
 
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     target = data.get("target")
     models_dir = os.path.join(LIBRARY_DIR, "models")
     hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
@@ -841,6 +893,94 @@ def _html_to_text(soup):
 def _split(text):
     sentences = segmenter.segment(text)
     return [s.strip() for s in sentences if s.strip()]
+
+
+def _re_extract(item):
+    """Re-extract text from the original source. Returns dict with updated
+    fields or None if re-extraction isn't possible."""
+    import tempfile
+    import urllib.request
+
+    source_url = item.get("source_url")
+    original_path = item.get("original_path")
+
+    if original_path and os.path.isfile(original_path):
+        img_dir = item_images_dir(item["id"])
+        os.makedirs(img_dir, exist_ok=True)
+        result = extract_with_images(original_path, img_dir)
+        if not result or not result["text"].strip():
+            return None
+        text = result["text"]
+        sentences = _split(text)
+        if not sentences:
+            return None
+        images = map_images_to_sentences(result.get("images", []), text, sentences)
+        reader_html = result.get("reader_html")
+        toc = result.get("toc")
+        if reader_html:
+            reader_html = inject_sentence_spans(reader_html, sentences)
+        return {"text": text, "sentences": sentences, "reader_html": reader_html, "toc": toc, "images": images}
+
+    if source_url and _is_safe_url(source_url):
+        try:
+            ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+            req = urllib.request.Request(source_url, headers={"User-Agent": ua})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                content_type = resp.headers.get("Content-Type", "").lower()
+                raw_bytes = resp.read(50 * 1024 * 1024 + 1)
+        except Exception:
+            return None
+
+        is_pdf = "application/pdf" in content_type or source_url.lower().split("?")[0].endswith(".pdf")
+        if is_pdf:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(raw_bytes)
+                tmp_path = tmp.name
+            try:
+                img_dir = item_images_dir(item["id"])
+                os.makedirs(img_dir, exist_ok=True)
+                result = extract_with_images(tmp_path, img_dir)
+                if not result or not result["text"].strip():
+                    return None
+                text = result["text"]
+                sentences = _split(text)
+                if not sentences:
+                    return None
+                images = map_images_to_sentences(result.get("images", []), text, sentences)
+                reader_html = result.get("reader_html")
+                toc = result.get("toc")
+                if reader_html:
+                    reader_html = inject_sentence_spans(reader_html, sentences)
+                return {"text": text, "sentences": sentences, "reader_html": reader_html, "toc": toc, "images": images}
+            finally:
+                os.unlink(tmp_path)
+
+        from email.message import Message
+
+        msg = Message()
+        msg["content-type"] = content_type
+        charset = msg.get_param("charset", "utf-8")
+        try:
+            downloaded = raw_bytes.decode(charset)
+        except (UnicodeDecodeError, LookupError):
+            downloaded = raw_bytes.decode("utf-8", errors="replace")
+
+        reader_html, _title = clean_html_for_reader(downloaded, source_url)
+        if not reader_html or not reader_html.strip():
+            return None
+
+        from bs4 import BeautifulSoup
+
+        text = _html_to_text(BeautifulSoup(reader_html, "html.parser"))
+        if not text.strip():
+            return None
+        sentences = _split(text)
+        if not sentences:
+            return None
+        reader_html = inject_sentence_spans(reader_html, sentences)
+        return {"text": text, "sentences": sentences, "reader_html": reader_html}
+
+    return None
 
 
 def _start_generation(item_id, sentences, engine_override=None):

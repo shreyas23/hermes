@@ -86,6 +86,7 @@ export function initPlayer() {
   });
 
   btnSpeed.addEventListener('click', () => cycleSpeed(1));
+  btnSpeed.addEventListener('contextmenu', (e) => { e.preventDefault(); cycleSpeed(-1); });
 
   state.audio.addEventListener('ended', async () => {
     state.playing = false;

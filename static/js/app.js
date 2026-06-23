@@ -1,7 +1,7 @@
 import { api, connectSSE } from './api.js';
 import { state } from './state.js';
 import { initSidebar, loadView, loadCollections, updateGenerationProgress } from './sidebar.js';
-import { initReaderHighlight, renderContent } from './reader-highlight.js';
+import { initReaderHighlight, renderContent, toggleTeleprompter } from './reader-highlight.js';
 import { initPlayer, play, pause, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
 import { initDiscover } from './discover.js';
@@ -101,12 +101,19 @@ document.getElementById('audio-gen-caret').addEventListener('click', (e) => {
   genMenu.style.top = above >= 0 ? `${above}px` : `${rect.bottom + 4}px`;
 });
 
-genMenu.addEventListener('click', (e) => {
+genMenu.addEventListener('click', async (e) => {
   const item = e.target.closest('.audio-gen__menu-item');
   if (!item) return;
   selectedEngine = item.dataset.engine;
   updateActiveEngine();
   genMenu.classList.remove('is-visible');
+  const id = state.currentItemId;
+  if (!id) return;
+  const data = await api(`/api/library/${id}/generate`, { method: 'POST', body: { engine: selectedEngine } });
+  if (data.error) return;
+  if (state.currentItem) state.currentItem.generating = true;
+  renderAudioGen({ generating: true });
+  loadView(state.currentView);
 });
 
 document.addEventListener('click', () => genMenu.classList.remove('is-visible'));
@@ -170,6 +177,12 @@ document.addEventListener('keydown', e => {
     case 'KeyN':
       e.preventDefault();
       advanceQueue();
+      break;
+    case 'KeyT':
+      if (playerState.classList.contains('is-visible')) {
+        e.preventDefault();
+        toggleTeleprompter();
+      }
       break;
     case 'Escape':
       if (playerState.classList.contains('is-visible') && !document.querySelector('.modal-backdrop.is-visible')) {

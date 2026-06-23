@@ -802,6 +802,34 @@ mark.search-hit.is-current {
   color: var(--text-inverse);
 }
 
+/* Teleprompter toggle */
+.reader__teleprompter-btn {
+  position: absolute;
+  top: var(--space-3);
+  right: calc(var(--space-3) + (var(--reader-btn-size) + var(--space-2)) * 2);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--reader-btn-size);
+  height: var(--reader-btn-size);
+  background: var(--glass-bg-heavy);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--glass-shadow);
+  transition: color var(--transition-base), background var(--transition-base);
+}
+
+.reader__teleprompter-btn:hover,
+.reader__teleprompter-btn.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Bookmarks & annotations */
 .reader__bookmarks-btn {
   position: absolute;
@@ -1085,6 +1113,11 @@ mark.search-hit.is-current {
 
 .confirm__message:empty {
   display: none;
+}
+
+#confirm-input {
+  width: 100%;
+  margin-bottom: var(--space-3);
 }
 
 .modal__tabs {
@@ -1409,6 +1442,38 @@ mark.search-hit.is-current {
 .context-menu__item--destructive:hover {
   background: var(--destructive);
   color: var(--text-inverse);
+}
+
+.context-menu__item--submenu {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.context-menu__item--submenu::after {
+  content: '\203A';
+  font-size: var(--text-lg);
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.context-menu__submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  background: var(--glass-bg-heavy);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1) 0;
+  min-width: 160px;
+  box-shadow: var(--glass-shadow-elevated);
+  display: none;
+}
+
+.context-menu__item--submenu:hover > .context-menu__submenu {
+  display: block;
 }
 
 .context-menu__separator {
@@ -1989,6 +2054,162 @@ mark.search-hit.is-current {
   font-weight: var(--font-medium);
   color: var(--text-secondary);
   margin-right: var(--space-1);
+}
+
+/* ─── Teleprompter mode ─── */
+.app--teleprompter .sidebar {
+  display: none;
+}
+
+.app--teleprompter .main {
+  background: #0a0a0a;
+}
+
+.app--teleprompter .reader__toc-btn,
+.app--teleprompter .reader__search-btn,
+.app--teleprompter .reader__bookmarks-btn,
+.app--teleprompter .reader__bookmarks,
+.app--teleprompter .reader__search,
+.app--teleprompter .reader__toc {
+  display: none !important;
+}
+
+.app--teleprompter .reader__teleprompter-btn {
+  right: var(--space-3);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.app--teleprompter .reader__teleprompter-btn.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.app--teleprompter .reader__scroll {
+  padding: 40vh 60px 40vh 60px;
+  scrollbar-width: none;
+}
+
+.app--teleprompter .reader__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.app--teleprompter .reader__scroll > * {
+  max-width: 800px;
+}
+
+/* Fade edges */
+.app--teleprompter .reader::before,
+.app--teleprompter .reader::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 120px;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.app--teleprompter .reader::before {
+  top: 0;
+  background: linear-gradient(to bottom, #0a0a0a 0%, transparent 100%);
+}
+
+.app--teleprompter .reader::after {
+  bottom: 0;
+  background: linear-gradient(to top, #0a0a0a 0%, transparent 100%);
+}
+
+/* Hide structural elements (headings, images, etc.) — only show sentences */
+.app--teleprompter .reader__scroll h1,
+.app--teleprompter .reader__scroll h2,
+.app--teleprompter .reader__scroll h3,
+.app--teleprompter .reader__scroll h4,
+.app--teleprompter .reader__scroll h5,
+.app--teleprompter .reader__scroll h6 {
+  display: none;
+}
+
+.app--teleprompter .reader__scroll img,
+.app--teleprompter .reader__scroll figure {
+  display: none;
+}
+
+/* Headings that contain sentence spans should still show */
+.app--teleprompter .reader__scroll :is(h1, h2, h3, h4, h5, h6):has([data-si]) {
+  display: block;
+  font-size: inherit;
+  font-weight: inherit;
+  margin: 0;
+}
+
+/* Sentence styling — dim everything by default */
+.app--teleprompter .reader__scroll p,
+.app--teleprompter .reader__paragraph,
+.app--teleprompter .reader__scroll [data-si] {
+  color: #333;
+  font-size: 20px;
+  line-height: 1.7;
+  transition: color 0.3s, background 0.3s;
+}
+
+.app--teleprompter .reader__scroll [data-si].is-reading {
+  color: #f0f0f0;
+  background: rgba(74, 158, 255, 0.08);
+  box-shadow: none;
+}
+
+.app--teleprompter .reader__scroll [data-si].is-near {
+  color: #777;
+}
+
+.app--teleprompter .reader__scroll [data-si].is-played {
+  color: #444;
+}
+
+/* Follow button adapts to dark bg */
+.app--teleprompter .reader__follow {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Controls adapt to dark bg */
+.app--teleprompter .controls {
+  background: rgba(20, 20, 20, 0.95);
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.app--teleprompter .controls__btn:not(.controls__btn--play) {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app--teleprompter .controls__btn:not(.controls__btn--play):hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app--teleprompter .controls__time {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.app--teleprompter #status-text {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.app--teleprompter .controls__status-btn {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.app--teleprompter .controls__status-btn:hover,
+.app--teleprompter .controls__status-btn.is-active {
+  color: var(--accent);
+}
+
+/* Audio gen bar */
+.app--teleprompter .audio-gen {
+  background: rgba(20, 20, 20, 0.95);
 }
 
 /* Utility: hidden */
