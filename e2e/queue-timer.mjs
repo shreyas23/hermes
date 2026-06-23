@@ -8,7 +8,7 @@ const DIR = 'e2e/screenshots';
 
 execSync(`mkdir -p ${DIR}`);
 
-const server = spawn('/opt/homebrew/bin/uv', ['run', 'python', '-c', [
+const server = spawn('uv', ['run', 'python', '-c', [
   "import sys; sys.path.insert(0, '.')",
   "from app import app, init_db",
   "init_db()",

@@ -9,7 +9,7 @@ execSync(`mkdir -p ${DIR}`);
 
 // Isolated temp library seeded with one audio-ready item (silent WAV) so the
 // player can actually start without TTS or touching the real library.
-const server = spawn('/opt/homebrew/bin/uv', ['run', 'python', '-c', [
+const server = spawn('uv', ['run', 'python', '-c', [
   "import sys, os, tempfile, wave; sys.path.insert(0, '.')",
   "import models",
   "d = tempfile.mkdtemp()",

@@ -11,7 +11,7 @@ const DIR = 'e2e/screenshots';
 
 execSync(`mkdir -p ${DIR}`);
 
-const server = spawn('/opt/homebrew/bin/uv', ['run', 'python', '-c', [
+const server = spawn('uv', ['run', 'python', '-c', [
   "import sys; sys.path.insert(0, '.')",
   "import models; models.DB_PATH = '/tmp/hermes-test-dragdrop.db'; models.AUDIO_DIR = '/tmp/hermes-test-audio'; models.IMAGES_DIR = '/tmp/hermes-test-images'",
   "from app import app, init_db",

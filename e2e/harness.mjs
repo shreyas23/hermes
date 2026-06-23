@@ -18,7 +18,7 @@ export async function startServer(port, setupCode = '') {
     `app.run(port=${port}, threaded=True, use_reloader=False)`,
   ].filter(Boolean).join('\n');
 
-  const server = spawn('/opt/homebrew/bin/uv', ['run', 'python', '-c', code], { stdio: 'pipe' });
+  const server = spawn('uv', ['run', 'python', '-c', code], { stdio: 'pipe' });
   server.stderr.on('data', d => {
     const s = d.toString();
     if (s.includes('Traceback') || (s.includes('Error') && !s.includes('WARNING')))

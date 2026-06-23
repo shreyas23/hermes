@@ -9,7 +9,7 @@ const DIR = 'e2e/screenshots';
 execSync(`mkdir -p ${DIR}`);
 
 // Own server on an isolated temp library so the real ~/hermes-library is untouched.
-const server = spawn('/opt/homebrew/bin/uv', ['run', 'python', '-c', [
+const server = spawn('uv', ['run', 'python', '-c', [
   "import sys, os, tempfile; sys.path.insert(0, '.')",
   "import models",
   "d = tempfile.mkdtemp()",
