@@ -2,20 +2,42 @@
 
 # Hermes
 
+Turn anything you read into something you hear — privately, on your Mac.
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-13%2B-black?logo=apple)](https://github.com/shreyas23/hermes/releases)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org)
+
 Local macOS app that converts documents, articles, and feeds into audio. Runs entirely on-device — no accounts, no cloud, no subscriptions.
 
-**Supports:** PDF, DOCX, Markdown, HTML, RTF, plain text, web URLs, RSS/Atom feeds
+**Supports:** PDF, DOCX, Markdown, HTML, RTF, plain text, web URLs, RSS/Atom feeds, YouTube
 
-## Quick start
+## Install
 
-Requires macOS, Python 3.12+, and [uv](https://docs.astral.sh/uv/).
+Download `Hermes-<version>-mac.dmg` from the [latest release](https://github.com/shreyas23/hermes/releases). Open the DMG and drag Hermes to Applications.
+
+On first launch, macOS will block the app because it isn't code-signed. To open it:
+
+1. Right-click (or Control-click) `Hermes.app` → **Open**
+2. Click **Open** in the dialog
+
+Or from Terminal:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/shreyas23/hermes.git
-cd hermes
-uv run python app.py
+xattr -cr /Applications/Hermes.app
 ```
+
+You only need to do this once.
+
+## Why Hermes?
+
+Most listen-to-anything tools (Speechify, ElevenReader, etc.) run in the cloud, require subscriptions, and send your documents to someone else's server.
+
+- **Private** — everything stays on your machine. No accounts, no uploads, no tracking. Safe for work documents, legal files, medical records.
+- **Multiple TTS engines** — five engines from built-in system voices to neural models running locally on Apple Silicon. Pick quality vs. speed per item.
+- **Teleprompter** — text scrolls in sync with audio, sentence by sentence. Click any sentence to jump there. Combine reading and listening for better retention.
+- **Desktop-native** — global media keys, menu bar presence, watch folders that auto-import new files. Lives where you already work.
+- **No subscription** — free and open source. No per-minute limits, no premium tiers.
 
 ## Features
 
@@ -26,11 +48,10 @@ uv run python app.py
 - **Sleep timer** — auto-pause after a set duration or at end of current item
 - **Global media keys** — play/pause/skip from anywhere via Media Session API
 - **Discover** — search Wikipedia, subscribe to RSS/Atom feeds and Substack newsletters
-- **Import** — URL, file, folder scan, drag-and-drop, watch folders (auto-import), pasted text
+- **Import** — URL, file, folder scan, drag-and-drop, watch folders (auto-import), pasted text, YouTube
 - **Reading tools** — transcript search, bookmarks & annotations
 - **Library** — collections, source-type filtering, search, structured PDF navigation (TOC, chapters)
-- **Design system** — three visual themes (Ink, Glass, Aurora) with light/dark modes
-- **Privacy** — fully local, all data in `~/hermes-library/`, nothing leaves the machine
+- **Design system** — three visual themes (Ink, Glass, Aurora) with light/dark modes, plus custom theme support
 
 ## Controls
 
@@ -56,6 +77,8 @@ Select the default engine in Settings. Override per-item via the dropdown on the
 ---
 
 ## Development
+
+Requires macOS, Python 3.12+, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/shreyas23/hermes.git && cd hermes
@@ -117,32 +140,7 @@ npm run e2e:all            # Playwright E2E tests (runs on port 5199)
 
 **New TTS engine:** Create `engines/<name>.py` with a `TTSEngine` subclass implementing `generate_sentence()` and `list_voices()`. Register in `engines/__init__.py`. Add voice setting to `models.DEFAULTS` and `_ALLOWED_SETTINGS` in `app.py`. Add UI option in `templates/index.html` and `static/js/settings.js`.
 
-### Dependencies
-
-Python: [uv](https://docs.astral.sh/uv/) managed. Key packages: flask, pywebview, pymupdf, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura, kokoro-onnx, piper-tts.
-
-Node: playwright (E2E tests only).
-
-## Installing from DMG
-
-Download `Hermes-<version>-mac.dmg` from the [latest release](https://github.com/shreyas23/hermes/releases). Open the DMG and drag Hermes to Applications.
-
-On first launch, macOS will block the app because it isn't code-signed. To open it:
-
-1. Right-click (or Control-click) `Hermes.app` → **Open**
-2. Click **Open** in the dialog
-
-Or from Terminal:
-
-```bash
-xattr -cr /Applications/Hermes.app
-```
-
-You only need to do this once.
-
-## Building the DMG locally
-
-Requires macOS, Python 3.12+, and [uv](https://docs.astral.sh/uv/).
+### Building the DMG locally
 
 ```bash
 git clone https://github.com/shreyas23/hermes.git && cd hermes
@@ -156,10 +154,20 @@ hdiutil create -volname "Hermes" -srcfolder dist/dmg -ov -format UDZO dist/Herme
 
 The DMG will be at `dist/Hermes.dmg`. Open it and drag Hermes to Applications. The same Gatekeeper bypass above applies to locally-built copies.
 
+### Dependencies
+
+Python: [uv](https://docs.astral.sh/uv/) managed. Key packages: flask, pywebview, pymupdf, python-docx, beautifulsoup4, striprtf, pysbd, trafilatura, kokoro-onnx, piper-tts.
+
+Node: playwright (E2E tests only).
+
 ## Contributing
 
-Fork, branch, test with real documents, open a PR. Vanilla JS frontend, no build step.
+Contributions are welcome. The frontend is vanilla HTML/CSS/JS with no build step, so you can start editing immediately.
+
+Good first areas: new document format extractors, TTS engine integrations, UI improvements, bug fixes. Check the [issues](https://github.com/shreyas23/hermes/issues) for ideas.
+
+To contribute: fork the repo, create a branch, test with real documents (`uv run pytest` for unit tests, `npm run e2e:all` for E2E), and open a PR.
 
 ## License
 
-MIT
+[AGPL-3.0](LICENSE)
