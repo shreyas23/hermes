@@ -10,7 +10,7 @@ Turn anything you read into something you hear — privately, on your Mac.
 
 Local macOS app that converts documents, articles, and feeds into audio. Runs entirely on-device — no accounts, no cloud, no subscriptions.
 
-<img alt="Hermes demo — library, reader, playback with sentence highlighting, teleprompter mode" src="assets/demo.gif" width="1200" />
+<img alt="Hermes — article open with sentence highlighting during playback" src="assets/demo.png" width="1200" />
 
 **Supports:** PDF, DOCX, Markdown, HTML, RTF, plain text, web URLs, RSS/Atom feeds, YouTube
 
