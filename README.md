@@ -10,6 +10,8 @@ Turn anything you read into something you hear — privately, on your Mac.
 
 Local macOS app that converts documents, articles, and feeds into audio. Runs entirely on-device — no accounts, no cloud, no subscriptions.
 
+<img alt="Hermes demo — library, reader, playback with sentence highlighting, teleprompter mode" src="assets/demo.gif" width="1200" />
+
 **Supports:** PDF, DOCX, Markdown, HTML, RTF, plain text, web URLs, RSS/Atom feeds, YouTube
 
 ## Install
@@ -73,6 +75,8 @@ Most listen-to-anything tools (Speechify, ElevenReader, etc.) run in the cloud, 
 | Piper | Local (CPU) | Medium | Fast | Lightweight per-voice models (~30MB each), 22050Hz native |
 
 Select the default engine in Settings. Override per-item via the dropdown on the Generate button.
+
+**Privacy note:** Edge TTS sends your text to Microsoft's text-to-speech service for audio generation. No text is stored or logged — processing is real-time only. No account or personal identifiers are required. See the [Edge TTS privacy policy](https://edge-tts.com/privacy/) for details. All other engines run fully on-device.
 
 ---
 
