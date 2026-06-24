@@ -123,6 +123,39 @@ Python: [uv](https://docs.astral.sh/uv/) managed. Key packages: flask, pywebview
 
 Node: playwright (E2E tests only).
 
+## Installing from DMG
+
+Download `Hermes-<version>-mac.dmg` from the [latest release](https://github.com/shreyas23/hermes/releases). Open the DMG and drag Hermes to Applications.
+
+On first launch, macOS will block the app because it isn't code-signed. To open it:
+
+1. Right-click (or Control-click) `Hermes.app` → **Open**
+2. Click **Open** in the dialog
+
+Or from Terminal:
+
+```bash
+xattr -cr /Applications/Hermes.app
+```
+
+You only need to do this once.
+
+## Building the DMG locally
+
+Requires macOS, Python 3.12+, and [uv](https://docs.astral.sh/uv/).
+
+```bash
+git clone https://github.com/shreyas23/hermes.git && cd hermes
+uv sync
+uv run pyinstaller hermes.spec --noconfirm
+mkdir -p dist/dmg
+cp -R dist/Hermes.app dist/dmg/
+ln -s /Applications dist/dmg/Applications
+hdiutil create -volname "Hermes" -srcfolder dist/dmg -ov -format UDZO dist/Hermes.dmg
+```
+
+The DMG will be at `dist/Hermes.dmg`. Open it and drag Hermes to Applications. The same Gatekeeper bypass above applies to locally-built copies.
+
 ## Contributing
 
 Fork, branch, test with real documents, open a PR. Vanilla JS frontend, no build step.
