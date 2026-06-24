@@ -28,7 +28,11 @@ jobs:
         run: uv run pyinstaller hermes.spec --noconfirm
 
       - name: Create DMG
-        run: hdiutil create -volname "Hermes" -srcfolder dist/Hermes.app -ov -format UDZO "dist/Hermes-${VERSION}-mac.dmg"
+        run: |
+          mkdir -p dist/dmg
+          cp -R dist/Hermes.app dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname "Hermes" -srcfolder dist/dmg -ov -format UDZO "dist/Hermes-${VERSION}-mac.dmg"
 
       - name: Generate checksum
         run: shasum -a 256 "dist/Hermes-${VERSION}-mac.dmg" > "dist/Hermes-${VERSION}-mac.dmg.sha256"
