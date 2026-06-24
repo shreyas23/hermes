@@ -564,7 +564,6 @@
 .reader__scroll strong,
 .reader__scroll b {
   font-weight: var(--font-semibold);
-  color: inherit;
 }
 
 .reader__scroll ul,
@@ -2279,8 +2278,8 @@ mark.search-hit.is-current {
 .app--teleprompter .reader__paragraph,
 .app--teleprompter .reader__scroll [data-si] {
   color: #333;
-  font-size: 20px;
-  line-height: 1.7;
+  font-size: var(--reader-font-size, 20px);
+  line-height: var(--reader-line-height, 1.7);
   transition: color 0.3s, background 0.3s;
 }
 

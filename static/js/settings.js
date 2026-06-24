@@ -376,6 +376,25 @@ export function handleTransferProgress(data) {
 }
 
 
+const FONT_SIZE_MIN = 12;
+const FONT_SIZE_MAX = 48;
+const FONT_SIZE_STEP = 1;
+
+let fontSizeSaveTimer = null;
+
+export async function adjustFontSize(delta) {
+  await appSettings._ready;
+  const current = parseInt(document.documentElement.style.getPropertyValue('--reader-font-size')) || 15;
+  const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, current + delta));
+  if (next === current) return;
+  setRange('setting-font-size', next, v => `${v}px`);
+  applyReaderSettings();
+  clearTimeout(fontSizeSaveTimer);
+  fontSizeSaveTimer = setTimeout(() => {
+    api('/api/settings', { body: { reader_font_size: String(next) } });
+  }, 400);
+}
+
 export const appSettings = {
   skipInterval: 15,
   defaultSpeed: 1.0,
@@ -392,6 +411,14 @@ function setRange(id, value, fmtFn) {
 }
 
 function initRangeInputs() {
+  const fontInput = document.getElementById('setting-font-size');
+  if (fontInput) {
+    fontInput.min = FONT_SIZE_MIN;
+    fontInput.max = FONT_SIZE_MAX;
+    fontInput.step = FONT_SIZE_STEP;
+  }
+
+  const readerIds = new Set(['setting-font-size', 'setting-line-height', 'setting-max-width']);
   const ranges = [
     ['setting-skip-interval', v => `${v}s`],
     ['setting-font-size', v => `${v}px`],
@@ -405,7 +432,10 @@ function initRangeInputs() {
     const input = document.getElementById(id);
     const label = document.getElementById(id + '-val');
     if (input && label) {
-      input.addEventListener('input', () => { label.textContent = fmt(input.value); });
+      input.addEventListener('input', () => {
+        label.textContent = fmt(input.value);
+        if (readerIds.has(id)) applyReaderSettings();
+      });
     }
   }
 }

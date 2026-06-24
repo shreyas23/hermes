@@ -154,7 +154,7 @@ Stored in SQLite `settings` table. Key settings:
 - `skip_interval` — skip forward/back seconds (`15` default, range 5–60)
 - `default_speed` — initial playback speed (`1` default, one of 0.5/0.75/1/1.25/1.5/2)
 - `auto_scroll` — whether reader auto-follows playback (`on` default)
-- `reader_font_size` — reader text size in px (`15` default, range 12–24)
+- `reader_font_size` — reader text size in px (`15` default, range 12–48)
 - `reader_line_height` — reader line spacing (`1.8` default, range 1.2–2.4)
 - `reader_max_width` — reader content width in px (`720` default, range 500–1200)
 - `audio_bitrate` — AAC export bitrate (`64000` default, options: 32000/64000/96000/128000)

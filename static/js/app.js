@@ -5,7 +5,7 @@ import { initReaderHighlight, renderContent, toggleTeleprompter } from './reader
 import { initPlayer, play, pause, stop, seekToSentence, prepareControls } from './player.js';
 import { initModal } from './modal.js';
 import { initDiscover } from './discover.js';
-import { initSettings, handleTransferProgress } from './settings.js';
+import { initSettings, handleTransferProgress, adjustFontSize } from './settings.js';
 import { initConfirm } from './confirm-modal.js';
 import { initSearch, resetSearch } from './search.js';
 import { initBookmarks, loadBookmarks, resetBookmarks, addCurrent as addBookmark } from './bookmarks.js';
@@ -173,6 +173,17 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  if (meta && (e.key === '=' || e.key === '+')) {
+    e.preventDefault();
+    adjustFontSize(1);
+    return;
+  }
+  if (meta && e.key === '-') {
+    e.preventDefault();
+    adjustFontSize(-1);
+    return;
+  }
+
   if (meta || e.altKey) return;
 
   switch (e.code) {
@@ -191,7 +202,11 @@ document.addEventListener('keydown', e => {
       }
       break;
     case 'Escape':
-      if (playerState.classList.contains('is-visible') && !document.querySelector('.modal-backdrop.is-visible')) {
+      if (document.querySelector('.modal-backdrop.is-visible')) break;
+      if (document.getElementById('app').classList.contains('app--teleprompter')) {
+        e.preventDefault();
+        toggleTeleprompter();
+      } else if (playerState.classList.contains('is-visible')) {
         showView('empty');
         loadDashboard();
       }

@@ -36,10 +36,8 @@ export function initReaderHighlight(onSentenceClick) {
   });
 
   container.addEventListener('click', (e) => {
-    if (e.target.closest('a')) {
-      e.preventDefault();
-      return;
-    }
+    const link = e.target.closest('a');
+    if (link) e.preventDefault();
     const sel = window.getSelection();
     if (sel && sel.toString().trim()) return;
     const el = e.target.closest('[data-si]');
