@@ -1,3 +1,5 @@
+/* Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0. */
+
 /* ===== Glass — body gradient ===== */
 [data-design="glass"] body {
   background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-primary) 60%, rgba(0, 122, 255, 0.02) 100%);

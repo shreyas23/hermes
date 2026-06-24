@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 // Find-in-transcript: highlights matches in the reader and steps through them.
 // Pure frontend, operates on #reader-content text nodes (wraps matches in <mark>).
 

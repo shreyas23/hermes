@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 """Re-extract and re-map images for all existing library items."""
 
 import json

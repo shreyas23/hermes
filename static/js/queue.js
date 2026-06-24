@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 import { state } from './state.js';
 import { formatTime, escHtml } from './utils.js';
 import { toastSuccess } from './toast.js';

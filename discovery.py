@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 """Article discovery: Wikipedia search and RSS/Atom feed aggregation.
 
 This module only *finds* articles and produces URLs. Importing is delegated to

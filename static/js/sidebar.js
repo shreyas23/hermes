@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 import { api } from './api.js';
 import { state } from './state.js';
 import { showContextMenu } from './contextmenu.js';

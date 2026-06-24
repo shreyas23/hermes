@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 const container = document.getElementById('toast-container');
 
 export function toast(message, type = 'info') {

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 // Bookmarks & annotations: mark the active passage, list them, jump to them,
 // and attach a note (a bookmark with a note is an annotation).
 import { api } from './api.js';

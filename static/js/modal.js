@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 import { api } from './api.js';
 import { confirmAction } from './confirm-modal.js';
 import { toastSuccess, toastError } from './toast.js';

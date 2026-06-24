@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 import { api } from './api.js';
 import { state, SPEED_OPTIONS } from './state.js';
 import { highlightCurrentSentence, getCurrentSentenceIndex, clearHighlights } from './reader-highlight.js';

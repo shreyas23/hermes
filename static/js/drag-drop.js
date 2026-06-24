@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Shreyas Niradi. Licensed under AGPL-3.0.
+
 import { toastSuccess, toastError } from './toast.js';
 
 const SUPPORTED = new Set(['.pdf', '.docx', '.md', '.txt', '.rtf', '.html', '.htm']);
