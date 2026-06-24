@@ -556,12 +556,15 @@
 }
 
 .reader__scroll a {
-  color: var(--accent);
+  color: inherit;
   text-decoration: none;
+  cursor: inherit;
 }
 
-.reader__scroll a:hover {
-  text-decoration: underline;
+.reader__scroll strong,
+.reader__scroll b {
+  font-weight: var(--font-semibold);
+  color: inherit;
 }
 
 .reader__scroll ul,
