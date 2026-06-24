@@ -1,28 +1,30 @@
 import socket
+import urllib.request
 from unittest.mock import patch
 
+import pytest
 from bs4 import BeautifulSoup
 
 from extractors import (
+    _check_ip,
     _extract_docx,
     _extract_md,
     _is_safe_url,
     clean_html_for_reader,
     inject_sentence_spans,
     map_images_to_sentences,
+    safe_urlopen,
 )
 
-# --- _is_safe_url (SSRF guard) ---
+# --- _is_safe_url (scheme guard) ---
 
 
 def test_safe_url_allows_https():
-    with patch("socket.gethostbyname", return_value="93.184.216.34"):
-        assert _is_safe_url("https://example.com") is True
+    assert _is_safe_url("https://example.com") is True
 
 
 def test_safe_url_allows_http():
-    with patch("socket.gethostbyname", return_value="93.184.216.34"):
-        assert _is_safe_url("http://example.com") is True
+    assert _is_safe_url("http://example.com") is True
 
 
 def test_safe_url_blocks_file_scheme():
@@ -33,34 +35,69 @@ def test_safe_url_blocks_ftp_scheme():
     assert _is_safe_url("ftp://example.com") is False
 
 
-def test_safe_url_blocks_localhost():
-    with patch("socket.gethostbyname", return_value="127.0.0.1"):
-        assert _is_safe_url("http://localhost/secret") is False
+def test_safe_url_blocks_empty_hostname():
+    assert _is_safe_url("http://") is False
 
 
-def test_safe_url_blocks_loopback_ip():
-    with patch("socket.gethostbyname", return_value="127.0.0.1"):
-        assert _is_safe_url("http://127.0.0.1/secret") is False
+# --- _check_ip (SSRF guard — validates resolved IPs) ---
 
 
-def test_safe_url_blocks_private_10_range():
-    with patch("socket.gethostbyname", return_value="10.0.0.1"):
-        assert _is_safe_url("http://10.0.0.1/internal") is False
+def _fake_addrinfo(ip):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 0, "", (ip, 443))]
 
 
-def test_safe_url_blocks_private_192_range():
-    with patch("socket.gethostbyname", return_value="192.168.1.1"):
-        assert _is_safe_url("http://192.168.1.1/internal") is False
+def test_check_ip_allows_public():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("93.184.216.34")):
+        _check_ip("example.com")
 
 
-def test_safe_url_blocks_link_local_metadata():
-    with patch("socket.gethostbyname", return_value="169.254.169.254"):
-        assert _is_safe_url("http://169.254.169.254/latest/meta-data/") is False
+def test_check_ip_blocks_loopback():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("127.0.0.1")):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("localhost")
 
 
-def test_safe_url_blocks_on_dns_failure():
-    with patch("socket.gethostbyname", side_effect=socket.gaierror):
-        assert _is_safe_url("https://does-not-resolve.invalid") is False
+def test_check_ip_blocks_private_10():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("10.0.0.1")):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("internal.corp")
+
+
+def test_check_ip_blocks_private_192():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("192.168.1.1")):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("router.local")
+
+
+def test_check_ip_blocks_link_local():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("169.254.169.254")):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("metadata.internal")
+
+
+def test_check_ip_blocks_ipv6_loopback():
+    with patch(
+        "socket.getaddrinfo",
+        return_value=[(socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("::1", 443, 0, 0))],
+    ):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("localhost")
+
+
+def test_check_ip_blocks_ipv6_link_local():
+    with patch(
+        "socket.getaddrinfo",
+        return_value=[(socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("fe80::1", 443, 0, 0))],
+    ):
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            _check_ip("link-local.test")
+
+
+def test_safe_urlopen_blocks_private_ip():
+    with patch("socket.getaddrinfo", return_value=_fake_addrinfo("127.0.0.1")):
+        req = urllib.request.Request("http://evil.com", headers={"User-Agent": "test"})
+        with pytest.raises(ValueError, match="Blocked internal address"):
+            safe_urlopen(req, timeout=5)
 
 
 # --- inject_sentence_spans ---

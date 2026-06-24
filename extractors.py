@@ -1,5 +1,7 @@
 import os
 import re
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -564,28 +566,66 @@ def map_images_to_sentences(images: list, text: str, sentences: list) -> list:
 
 
 def _is_safe_url(url: str) -> bool:
-    import socket
     from urllib.parse import urlparse
 
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return False
-    hostname = parsed.hostname or ""
-    try:
-        ip = socket.gethostbyname(hostname)
-        import ipaddress
-
-        addr = ipaddress.ip_address(ip)
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-            return False
-    except (socket.gaierror, ValueError):
+    if not parsed.hostname:
         return False
     return True
 
 
-def _download_image(url: str, image_dir: str, index: int) -> str | None:
-    import urllib.request
+def _check_ip(host, port=None, family=0):
+    """Resolve and validate that the IP is not private/internal (SSRF guard)."""
+    import ipaddress
+    import socket
 
+    results = socket.getaddrinfo(host, port or 443, family, socket.SOCK_STREAM)
+    for family, _, _, _, sockaddr in results:
+        ip_str = sockaddr[0]
+        addr = ipaddress.ip_address(ip_str)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            raise ValueError(f"Blocked internal address: {ip_str}")
+    return results
+
+
+class _SafeHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        _check_ip(req.host.split(":")[0])
+        return super().http_open(req)
+
+
+class _SafeHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        _check_ip(req.host.split(":")[0])
+        return super().https_open(req)
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        from urllib.parse import urlparse
+
+        parsed = urlparse(newurl)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Blocked redirect to {parsed.scheme}://")
+        _check_ip(parsed.hostname)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_safe_opener = urllib.request.build_opener(_SafeHTTPHandler, _SafeHTTPSHandler, _SafeRedirectHandler)
+
+
+def safe_urlopen(req, **kwargs):
+    """urlopen that validates IPs at connect time and on every redirect."""
+    if isinstance(req, str):
+        req = urllib.request.Request(req)
+    host = urllib.parse.urlparse(req.full_url).hostname
+    _check_ip(host)
+    return _safe_opener.open(req, **kwargs)
+
+
+def _download_image(url: str, image_dir: str, index: int) -> str | None:
     if not _is_safe_url(url):
         return None
     try:
@@ -593,7 +633,7 @@ def _download_image(url: str, image_dir: str, index: int) -> str | None:
         filename = f"img_{index}{ext}"
         filepath = os.path.join(image_dir, filename)
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with safe_urlopen(req, timeout=10) as resp:
             data = resp.read(5 * 1024 * 1024)
             with open(filepath, "wb") as f:
                 f.write(data)

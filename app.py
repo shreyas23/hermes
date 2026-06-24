@@ -19,6 +19,7 @@ from extractors import (
     extract_with_images,
     inject_sentence_spans,
     map_images_to_sentences,
+    safe_urlopen,
 )
 from models import (
     BUILTIN_DESIGNS,
@@ -398,11 +399,13 @@ def import_url():
     MAX_DOWNLOAD = 50 * 1024 * 1024
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with safe_urlopen(req, timeout=30) as resp:
             content_type = resp.headers.get("Content-Type", "").lower()
             raw_bytes = resp.read(MAX_DOWNLOAD + 1)
             if len(raw_bytes) > MAX_DOWNLOAD:
                 return jsonify({"error": "File too large (max 50MB)"}), 400
+    except ValueError as e:
+        return jsonify({"error": f"URL blocked: {e}"}), 400
     except Exception:
         return jsonify({"error": "Could not download page"}), 400
     if not raw_bytes:
@@ -1220,7 +1223,7 @@ def _re_extract(item):
         try:
             ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
             req = urllib.request.Request(source_url, headers={"User-Agent": ua})
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with safe_urlopen(req, timeout=30) as resp:
                 content_type = resp.headers.get("Content-Type", "").lower()
                 raw_bytes = resp.read(50 * 1024 * 1024 + 1)
         except Exception:
