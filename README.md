@@ -143,13 +143,15 @@ npm run e2e:all            # Playwright E2E tests (runs on port 5199)
 git clone https://github.com/shreyas23/hermes.git && cd hermes
 uv sync
 uv run pyinstaller hermes.spec --noconfirm
-mkdir -p dist/dmg
-cp -R dist/Hermes.app dist/dmg/
-ln -s /Applications dist/dmg/Applications
-hdiutil create -volname "Hermes" -srcfolder dist/dmg -ov -format UDZO dist/Hermes.dmg
+codesign --force --deep --sign - dist/Hermes.app
+brew install create-dmg
+create-dmg --volname "Hermes" --background "assets/dmg-background.png" \
+  --window-size 660 400 --icon-size 80 --icon "Hermes.app" 165 190 \
+  --app-drop-link 495 190 --hide-extension "Hermes.app" --format UDZO \
+  dist/Hermes.dmg dist/Hermes.app
 ```
 
-The DMG will be at `dist/Hermes.dmg`. Open it and drag Hermes to Applications. The same Gatekeeper bypass above applies to locally-built copies.
+The DMG will be at `dist/Hermes.dmg`. The same Gatekeeper bypass above applies to locally-built copies.
 
 ### Dependencies
 

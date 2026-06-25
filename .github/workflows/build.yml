@@ -33,12 +33,22 @@ jobs:
       - name: Ad-hoc codesign
         run: codesign --force --deep --sign - dist/Hermes.app
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Create DMG
         run: |
-          mkdir -p dist/dmg
-          cp -R dist/Hermes.app dist/dmg/
-          ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname "Hermes" -srcfolder dist/dmg -ov -format UDZO "dist/Hermes-${VERSION}-mac.dmg"
+          create-dmg \
+            --volname "Hermes" \
+            --background "assets/dmg-background.png" \
+            --window-size 660 400 \
+            --icon-size 80 \
+            --icon "Hermes.app" 165 190 \
+            --app-drop-link 495 190 \
+            --hide-extension "Hermes.app" \
+            --format UDZO \
+            "dist/Hermes-${VERSION}-mac.dmg" \
+            dist/Hermes.app
 
       - name: Generate checksum
         run: shasum -a 256 "dist/Hermes-${VERSION}-mac.dmg" > "dist/Hermes-${VERSION}-mac.dmg.sha256"
