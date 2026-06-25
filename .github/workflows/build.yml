@@ -30,6 +30,9 @@ jobs:
       - name: Build app bundle
         run: uv run pyinstaller hermes.spec --noconfirm
 
+      - name: Ad-hoc codesign
+        run: codesign --force --deep --sign - dist/Hermes.app
+
       - name: Create DMG
         run: |
           mkdir -p dist/dmg
