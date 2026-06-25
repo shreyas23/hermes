@@ -592,39 +592,21 @@ def _check_ip(host, port=None, family=0):
     return results
 
 
-class _SafeHTTPHandler(urllib.request.HTTPHandler):
-    def http_open(self, req):
-        _check_ip(req.host.split(":")[0])
-        return super().http_open(req)
-
-
-class _SafeHTTPSHandler(urllib.request.HTTPSHandler):
-    def https_open(self, req):
-        _check_ip(req.host.split(":")[0])
-        return super().https_open(req)
-
-
-class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        from urllib.parse import urlparse
-
-        parsed = urlparse(newurl)
-        if parsed.scheme not in ("http", "https"):
-            raise ValueError(f"Blocked redirect to {parsed.scheme}://")
-        _check_ip(parsed.hostname)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-_safe_opener = urllib.request.build_opener(_SafeHTTPHandler, _SafeHTTPSHandler, _SafeRedirectHandler)
-
-
 def safe_urlopen(req, **kwargs):
-    """urlopen that validates IPs at connect time and on every redirect."""
+    """urlopen with SSRF protection: validates resolved IPs and checks redirects."""
     if isinstance(req, str):
         req = urllib.request.Request(req)
     host = urllib.parse.urlparse(req.full_url).hostname
     _check_ip(host)
-    return _safe_opener.open(req, **kwargs)
+    resp = urllib.request.urlopen(req, **kwargs)
+    final_host = urllib.parse.urlparse(resp.url).hostname
+    if final_host and final_host != host:
+        try:
+            _check_ip(final_host)
+        except ValueError:
+            resp.close()
+            raise
+    return resp
 
 
 def _download_image(url: str, image_dir: str, index: int) -> str | None:
