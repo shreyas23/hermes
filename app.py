@@ -1361,7 +1361,7 @@ if __name__ == "__main__":
         window.hide()
         return False
 
-    def _setup_dock_reopen():
+    def _setup_dock_and_quit():
         import time
 
         time.sleep(1)
@@ -1381,14 +1381,23 @@ if __name__ == "__main__":
                 window.show()
                 return True
 
+            def _should_terminate(self, app):
+                close_db()
+                os._exit(0)
+
             objc.classAddMethod(
                 delegate.__class__,
                 b"applicationShouldHandleReopen:hasVisibleWindows:",
                 _reopen,
+            )
+            objc.classAddMethod(
+                delegate.__class__,
+                b"applicationShouldTerminate:",
+                _should_terminate,
             )
 
         except ImportError:
             pass
 
     window.events.closing += _on_closing
-    webview.start(func=_setup_dock_reopen)
+    webview.start(func=_setup_dock_and_quit)
