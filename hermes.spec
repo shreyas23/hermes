@@ -10,6 +10,7 @@ a = Analysis(
     datas=[
         ('templates', 'templates'),
         ('static', 'static'),
+        ('assets', 'assets'),
     ],
     hiddenimports=[
         'pysbd.lang.english',
@@ -83,5 +84,26 @@ app = BUNDLE(
         'CFBundleVersion': '0.1.0',
         'CFBundleShortVersionString': '0.1.0',
         'NSHighResolutionCapable': True,
+        'LSMinimumSystemVersion': '13.0',
+        'LSApplicationCategoryType': 'public.app-category.productivity',
+        'NSHumanReadableCopyright': 'Copyright © 2026 Shreyas Niradi. AGPL-3.0.',
+        'NSAppTransportSecurity': {'NSAllowsArbitraryLoads': True},
+        'CFBundleDocumentTypes': [
+            {
+                'CFBundleTypeName': 'PDF Document',
+                'CFBundleTypeExtensions': ['pdf'],
+                'CFBundleTypeRole': 'Viewer',
+            },
+            {
+                'CFBundleTypeName': 'Word Document',
+                'CFBundleTypeExtensions': ['docx'],
+                'CFBundleTypeRole': 'Viewer',
+            },
+            {
+                'CFBundleTypeName': 'Text Document',
+                'CFBundleTypeExtensions': ['txt', 'md', 'rtf', 'html', 'htm'],
+                'CFBundleTypeRole': 'Viewer',
+            },
+        ],
     },
 )

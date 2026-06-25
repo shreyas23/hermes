@@ -38,6 +38,7 @@ initSidebar({
     if (state.currentItemId === itemId) {
       state.currentItemId = null;
       state.currentItem = null;
+      document.title = 'Hermes';
       showView('empty');
       loadDashboard();
     }
@@ -276,6 +277,7 @@ async function openItem(itemId) {
 
   state.currentItem = data.item;
   const item = data.item;
+  document.title = item.title ? `${item.title} — Hermes` : 'Hermes';
 
   document.querySelectorAll('.item').forEach(el => el.classList.remove('is-active'));
 

@@ -1343,6 +1343,8 @@ def start_server():
 
 
 if __name__ == "__main__":
+    import sys
+
     import webview
 
     server_thread = threading.Thread(target=start_server, daemon=True)
@@ -1361,21 +1363,35 @@ if __name__ == "__main__":
         window.hide()
         return False
 
-    def _setup_dock_and_quit():
+    def _setup_native_behavior():
         import time
 
         time.sleep(1)
         try:
             import objc
-            from AppKit import NSApplication, NSImage
+            from AppKit import NSApplication, NSImage, NSMenu, NSMenuItem
 
             ns_app = NSApplication.sharedApplication()
             delegate = ns_app.delegate()
 
-            icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.icns")
+            # Dock icon — use PyInstaller _MEIPASS base if bundled
+            base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+            icon_path = os.path.join(base, "assets", "icon.icns")
             if os.path.isfile(icon_path):
                 icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
                 ns_app.setApplicationIconImage_(icon)
+
+            # Cmd+W — hide window (standard macOS close-window shortcut)
+            main_menu = ns_app.mainMenu()
+            if main_menu:
+                window_menu = NSMenu.alloc().initWithTitle_("Window")
+                close_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                    "Close Window", objc.selector(None, selector=b"performClose:"), "w"
+                )
+                window_menu.addItem_(close_item)
+                window_menu_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Window", None, "")
+                window_menu_item.setSubmenu_(window_menu)
+                main_menu.addItem_(window_menu_item)
 
             def _reopen(self, app, flag):
                 window.show()
@@ -1400,4 +1416,4 @@ if __name__ == "__main__":
             pass
 
     window.events.closing += _on_closing
-    webview.start(func=_setup_dock_and_quit)
+    webview.start(func=_setup_native_behavior)
