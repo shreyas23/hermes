@@ -16,16 +16,17 @@ from audio import cancel_generation, generate_audio_background, is_generating
 from discovery import fetch_entries, load_feed, search_wikipedia
 from extractors import (
     SUPPORTED_EXTENSIONS,
+    FileTooLargeError,
     _is_safe_url,
     _looks_paywalled,
     _strip_wayback_toolbar,
     clean_html_for_reader,
+    decode_response,
     extract_with_images,
     fetch_archive_fallback,
     fetch_with_bypass,
     inject_sentence_spans,
     map_images_to_sentences,
-    safe_urlopen,
 )
 from models import (
     BUILTIN_DESIGNS,
@@ -403,6 +404,8 @@ def import_url():
         raw_bytes, content_type = fetch_with_bypass(url, max_size=MAX_DOWNLOAD)
     except ValueError as e:
         return jsonify({"error": f"URL blocked: {e}"}), 400
+    except FileTooLargeError:
+        return jsonify({"error": "File too large (max 50MB)"}), 400
     except Exception:
         return jsonify({"error": "Could not download page"}), 400
     if not raw_bytes:
@@ -424,7 +427,21 @@ def import_url():
             try:
                 result = extract_with_images(tmp_path, img_dir)
                 if not result or not result["text"].strip():
-                    return jsonify({"error": "Could not extract text from PDF"}), 400
+                    _rmdir_safe(img_dir)
+                    try:
+                        arc_bytes, arc_type = fetch_archive_fallback(url, max_size=MAX_DOWNLOAD)
+                        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as arc_tmp:
+                            arc_tmp.write(arc_bytes)
+                            arc_tmp_path = arc_tmp.name
+                        try:
+                            os.makedirs(img_dir, exist_ok=True)
+                            result = extract_with_images(arc_tmp_path, img_dir)
+                        finally:
+                            os.unlink(arc_tmp_path)
+                    except Exception:
+                        pass
+                    if not result or not result["text"].strip():
+                        return jsonify({"error": "Could not extract text from PDF"}), 400
 
                 text = result["text"]
                 title = Path(url.split("?")[0].split("/")[-1]).stem or url
@@ -464,15 +481,7 @@ def import_url():
         finally:
             os.unlink(tmp_path)
 
-    from email.message import Message
-
-    msg = Message()
-    msg["content-type"] = content_type
-    charset = msg.get_param("charset", "utf-8")
-    try:
-        downloaded = raw_bytes.decode(charset)
-    except (UnicodeDecodeError, LookupError):
-        downloaded = raw_bytes.decode("utf-8", errors="replace")
+    downloaded = decode_response(raw_bytes, content_type)
 
     reader_html, title = clean_html_for_reader(downloaded, url)
     title = title or url
@@ -486,13 +495,7 @@ def import_url():
     if _looks_paywalled(text_only):
         try:
             arc_bytes, arc_type = fetch_archive_fallback(url, max_size=MAX_DOWNLOAD)
-            arc_msg = Message()
-            arc_msg["content-type"] = arc_type
-            arc_charset = arc_msg.get_param("charset", "utf-8")
-            try:
-                arc_html = arc_bytes.decode(arc_charset)
-            except (UnicodeDecodeError, LookupError):
-                arc_html = arc_bytes.decode("utf-8", errors="replace")
+            arc_html = decode_response(arc_bytes, arc_type)
             arc_html = _strip_wayback_toolbar(arc_html)
             arc_reader, arc_title = clean_html_for_reader(arc_html, url)
             if arc_reader and arc_reader.strip():
@@ -1216,7 +1219,6 @@ def _re_extract(item):
         return None
 
     import tempfile
-    import urllib.request
 
     source_url = item.get("source_url")
     original_path = item.get("original_path")
@@ -1240,11 +1242,7 @@ def _re_extract(item):
 
     if source_url and _is_safe_url(source_url):
         try:
-            ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
-            req = urllib.request.Request(source_url, headers={"User-Agent": ua})
-            with safe_urlopen(req, timeout=30) as resp:
-                content_type = resp.headers.get("Content-Type", "").lower()
-                raw_bytes = resp.read(50 * 1024 * 1024 + 1)
+            raw_bytes, content_type = fetch_with_bypass(source_url)
         except Exception:
             return None
 
@@ -1272,23 +1270,30 @@ def _re_extract(item):
             finally:
                 os.unlink(tmp_path)
 
-        from email.message import Message
-
-        msg = Message()
-        msg["content-type"] = content_type
-        charset = msg.get_param("charset", "utf-8")
-        try:
-            downloaded = raw_bytes.decode(charset)
-        except (UnicodeDecodeError, LookupError):
-            downloaded = raw_bytes.decode("utf-8", errors="replace")
+        downloaded = decode_response(raw_bytes, content_type)
 
         reader_html, _title = clean_html_for_reader(downloaded, source_url)
-        if not reader_html or not reader_html.strip():
-            return None
 
         from bs4 import BeautifulSoup
 
-        text = _html_to_text(BeautifulSoup(reader_html, "html.parser"))
+        text = ""
+        if reader_html and reader_html.strip():
+            text = _html_to_text(BeautifulSoup(reader_html, "html.parser"))
+
+        if _looks_paywalled(text):
+            try:
+                arc_bytes, arc_type = fetch_archive_fallback(source_url)
+                arc_html = decode_response(arc_bytes, arc_type)
+                arc_html = _strip_wayback_toolbar(arc_html)
+                arc_reader, _ = clean_html_for_reader(arc_html, source_url)
+                if arc_reader and arc_reader.strip():
+                    arc_text = _html_to_text(BeautifulSoup(arc_reader, "html.parser"))
+                    if len(arc_text.strip()) > len(text.strip()):
+                        reader_html = arc_reader
+                        text = arc_text
+            except Exception:
+                pass
+
         if not text.strip():
             return None
         sentences = _split(text)

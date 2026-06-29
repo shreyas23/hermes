@@ -645,10 +645,27 @@ _MIN_ARTICLE_CHARS = 500
 
 
 def _looks_paywalled(text):
-    if not text or len(text.strip()) < _MIN_ARTICLE_CHARS:
+    if not text:
         return True
-    lower = text.lower()
-    return sum(1 for p in _PAYWALL_PHRASES if p in lower) >= 2
+    stripped = text.strip()
+    lower = stripped.lower()
+    has_phrases = sum(1 for p in _PAYWALL_PHRASES if p in lower) >= 2
+    if len(stripped) < _MIN_ARTICLE_CHARS:
+        return has_phrases
+    return has_phrases
+
+
+def decode_response(raw_bytes, content_type):
+    """Decode HTTP response bytes using the charset from Content-Type."""
+    from email.message import Message
+
+    msg = Message()
+    msg["content-type"] = content_type
+    charset = msg.get_param("charset", "utf-8")
+    try:
+        return raw_bytes.decode(charset)
+    except (UnicodeDecodeError, LookupError):
+        return raw_bytes.decode("utf-8", errors="replace")
 
 
 def _strip_wayback_toolbar(html):
@@ -663,17 +680,20 @@ def _strip_wayback_toolbar(html):
     return html
 
 
+class FileTooLargeError(Exception):
+    pass
+
+
 def fetch_with_bypass(url, max_size=50 * 1024 * 1024, timeout=30):
     """Fetch a URL trying multiple strategies to bypass soft paywalls.
 
     Returns (raw_bytes, content_type) or raises on total failure.
-    Tries crawler headers first, then archive.org for thin results.
+    Tries crawler headers first, falls back to next strategy on failure.
     """
     if not _is_safe_url(url):
         raise ValueError("URL blocked: private or internal address")
 
-    best_bytes = None
-    best_type = None
+    too_large = False
 
     for headers in _BYPASS_STRATEGIES:
         try:
@@ -682,19 +702,17 @@ def fetch_with_bypass(url, max_size=50 * 1024 * 1024, timeout=30):
                 content_type = resp.headers.get("Content-Type", "").lower()
                 raw = resp.read(max_size + 1)
                 if len(raw) > max_size:
+                    too_large = True
                     continue
-                if best_bytes is None or len(raw) > len(best_bytes):
-                    best_bytes = raw
-                    best_type = content_type
+                return raw, content_type
         except ValueError:
             raise
         except Exception:
             continue
 
-    if best_bytes is None:
-        raise ConnectionError("Could not download page")
-
-    return best_bytes, best_type
+    if too_large:
+        raise FileTooLargeError("File too large (max 50MB)")
+    raise ConnectionError("Could not download page")
 
 
 def fetch_archive_fallback(url, max_size=50 * 1024 * 1024, timeout=30):
@@ -710,7 +728,7 @@ def fetch_archive_fallback(url, max_size=50 * 1024 * 1024, timeout=30):
         content_type = resp.headers.get("Content-Type", "").lower()
         raw = resp.read(max_size + 1)
         if len(raw) > max_size:
-            raise ValueError("Archive page too large")
+            raise FileTooLargeError("Archive page too large")
     return raw, content_type
 
 
