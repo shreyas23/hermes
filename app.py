@@ -17,8 +17,12 @@ from discovery import fetch_entries, load_feed, search_wikipedia
 from extractors import (
     SUPPORTED_EXTENSIONS,
     _is_safe_url,
+    _looks_paywalled,
+    _strip_wayback_toolbar,
     clean_html_for_reader,
     extract_with_images,
+    fetch_archive_fallback,
+    fetch_with_bypass,
     inject_sentence_spans,
     map_images_to_sentences,
     safe_urlopen,
@@ -393,19 +397,10 @@ def import_url():
             return jsonify({"error": "duplicate", "existing": existing}), 409
 
     import tempfile
-    import urllib.request
-
-    if not _is_safe_url(url):
-        return jsonify({"error": "URL blocked: private or internal address"}), 400
 
     MAX_DOWNLOAD = 50 * 1024 * 1024
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-        with safe_urlopen(req, timeout=30) as resp:
-            content_type = resp.headers.get("Content-Type", "").lower()
-            raw_bytes = resp.read(MAX_DOWNLOAD + 1)
-            if len(raw_bytes) > MAX_DOWNLOAD:
-                return jsonify({"error": "File too large (max 50MB)"}), 400
+        raw_bytes, content_type = fetch_with_bypass(url, max_size=MAX_DOWNLOAD)
     except ValueError as e:
         return jsonify({"error": f"URL blocked: {e}"}), 400
     except Exception:
@@ -481,12 +476,34 @@ def import_url():
 
     reader_html, title = clean_html_for_reader(downloaded, url)
     title = title or url
-    if not reader_html or not reader_html.strip():
-        return jsonify({"error": "Could not extract article text"}), 400
 
     from bs4 import BeautifulSoup
 
-    text_only = _html_to_text(BeautifulSoup(reader_html, "html.parser"))
+    text_only = ""
+    if reader_html and reader_html.strip():
+        text_only = _html_to_text(BeautifulSoup(reader_html, "html.parser"))
+
+    if _looks_paywalled(text_only):
+        try:
+            arc_bytes, arc_type = fetch_archive_fallback(url, max_size=MAX_DOWNLOAD)
+            arc_msg = Message()
+            arc_msg["content-type"] = arc_type
+            arc_charset = arc_msg.get_param("charset", "utf-8")
+            try:
+                arc_html = arc_bytes.decode(arc_charset)
+            except (UnicodeDecodeError, LookupError):
+                arc_html = arc_bytes.decode("utf-8", errors="replace")
+            arc_html = _strip_wayback_toolbar(arc_html)
+            arc_reader, arc_title = clean_html_for_reader(arc_html, url)
+            if arc_reader and arc_reader.strip():
+                arc_text = _html_to_text(BeautifulSoup(arc_reader, "html.parser"))
+                if len(arc_text.strip()) > len(text_only.strip()):
+                    reader_html = arc_reader
+                    text_only = arc_text
+                    title = arc_title or title
+        except Exception:
+            pass
+
     if not text_only.strip():
         return jsonify({"error": "Could not extract article text"}), 400
 

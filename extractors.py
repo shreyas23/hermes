@@ -609,6 +609,111 @@ def safe_urlopen(req, **kwargs):
     return resp
 
 
+_BYPASS_STRATEGIES = [
+    {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Referer": "https://www.google.com/",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    },
+    {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://www.google.com/",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    },
+]
+
+_PAYWALL_PHRASES = [
+    "subscribe to continue",
+    "subscribe to read",
+    "sign in to continue",
+    "create a free account",
+    "premium subscribers",
+    "members only",
+    "paywall",
+    "already a subscriber",
+    "for subscribers",
+    "unlimited access",
+    "start your free trial",
+]
+
+_MIN_ARTICLE_CHARS = 500
+
+
+def _looks_paywalled(text):
+    if not text or len(text.strip()) < _MIN_ARTICLE_CHARS:
+        return True
+    lower = text.lower()
+    return sum(1 for p in _PAYWALL_PHRASES if p in lower) >= 2
+
+
+def _strip_wayback_toolbar(html):
+    """Remove the Wayback Machine toolbar and rewrite archived URLs."""
+    html = re.sub(
+        r"<!-- BEGIN WAYBACK TOOLBAR INSERT -->.*?<!-- END WAYBACK TOOLBAR INSERT -->",
+        "",
+        html,
+        flags=re.DOTALL,
+    )
+    html = re.sub(r'https?://web\.archive\.org/web/\d+[a-z]*/(.+?)(["\s\'><])', r"\1\2", html)
+    return html
+
+
+def fetch_with_bypass(url, max_size=50 * 1024 * 1024, timeout=30):
+    """Fetch a URL trying multiple strategies to bypass soft paywalls.
+
+    Returns (raw_bytes, content_type) or raises on total failure.
+    Tries crawler headers first, then archive.org for thin results.
+    """
+    if not _is_safe_url(url):
+        raise ValueError("URL blocked: private or internal address")
+
+    best_bytes = None
+    best_type = None
+
+    for headers in _BYPASS_STRATEGIES:
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with safe_urlopen(req, timeout=timeout) as resp:
+                content_type = resp.headers.get("Content-Type", "").lower()
+                raw = resp.read(max_size + 1)
+                if len(raw) > max_size:
+                    continue
+                if best_bytes is None or len(raw) > len(best_bytes):
+                    best_bytes = raw
+                    best_type = content_type
+        except ValueError:
+            raise
+        except Exception:
+            continue
+
+    if best_bytes is None:
+        raise ConnectionError("Could not download page")
+
+    return best_bytes, best_type
+
+
+def fetch_archive_fallback(url, max_size=50 * 1024 * 1024, timeout=30):
+    """Try fetching from the Wayback Machine as a last resort."""
+    archive_url = f"https://web.archive.org/web/{url}"
+    req = urllib.request.Request(
+        archive_url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        },
+    )
+    with safe_urlopen(req, timeout=timeout) as resp:
+        content_type = resp.headers.get("Content-Type", "").lower()
+        raw = resp.read(max_size + 1)
+        if len(raw) > max_size:
+            raise ValueError("Archive page too large")
+    return raw, content_type
+
+
 def _download_image(url: str, image_dir: str, index: int) -> str | None:
     if not _is_safe_url(url):
         return None
